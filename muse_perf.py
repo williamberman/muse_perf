@@ -90,7 +90,7 @@ def benchmark_transformer(
     return out
 
 
-def benchmark_vae(*, batch_size, dtype, compiled, autocast, vae):
+def benchmark_vae(*, device, batch_size, dtype, compiled, autocast, vae):
     label = f"{model}, single pass vae, batch_size: {batch_size}"
     description = f"dtype: {dtype}, compiled {compiled}, autocast {autocast}"
 
