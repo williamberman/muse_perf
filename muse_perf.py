@@ -261,8 +261,8 @@ def main_full(device, file):
 
         for batch_size in vae_params[device]["batch_size"]:
             for compiled in vae_params[device]["compiled"]:
-                vae = make_vae(device, compiled, dtype)
-                transformer = make_transformer(device, compiled, dtype)
+                vae = make_vae(device=device, compiled=compiled, dtype=dtype)
+                transformer = make_transformer(device=device, compiled=compiled, dtype=dtype)
 
                 pipe = PipelineMuse(
                     tokenizer=tokenizer,
