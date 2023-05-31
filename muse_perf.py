@@ -4,6 +4,8 @@ from muse import PipelineMuse
 
 from transformers import CLIPTextModel, AutoTokenizer
 
+from diffusers import UNet2DConditionModel
+
 import torch
 from torch.utils.benchmark import Timer, Compare
 from argparse import ArgumentParser
@@ -13,7 +15,8 @@ torch.set_grad_enabled(False)
 torch.set_float32_matmul_precision("high")
 
 num_threads = torch.get_num_threads()
-model = "openMUSE/muse-laiona6-uvit-clip-220k"
+muse_model = "openMUSE/muse-laiona6-uvit-clip-220k"
+sd_model = "runwayml/stable-diffusion-v1-5"
 prompt = "A high tech solarpunk utopia in the Amazon rainforest"
 
 
@@ -36,8 +39,8 @@ def make_encoder_hidden_states(*, device, dtype, batch_size, tokenizer, text_enc
     return encoder_hidden_states
 
 
-def make_transformer(*, device, compiled, dtype):
-    transformer = MaskGiTUViT.from_pretrained(model, subfolder="transformer")
+def make_muse_transformer(*, device, compiled, dtype):
+    transformer = MaskGiTUViT.from_pretrained(muse_model, subfolder="transformer")
 
     transformer = transformer.to(device=device, dtype=dtype)
 
@@ -47,8 +50,19 @@ def make_transformer(*, device, compiled, dtype):
     return transformer
 
 
+def make_sd_unet(*, device, compiled, dtype):
+    unet = UNet2DConditionModel.from_pretrained(sd_model, subfolder="unet")
+
+    unet = unet.to(device=device, dtype=dtype)
+
+    if compiled:
+        unet = torch.compile(unet)
+
+    return unet
+
+
 def make_vae(*, device, compiled, dtype):
-    vae = VQGANModel.from_pretrained(model, subfolder="vae")
+    vae = VQGANModel.from_pretrained(muse_model, subfolder="vae")
 
     vae = vae.to(device=device, dtype=dtype)
 
@@ -58,13 +72,11 @@ def make_vae(*, device, compiled, dtype):
     return vae
 
 
-def benchmark_transformer(
-    *, device, dtype, compiled, batch_size, transformer, encoder_hidden_states
+def benchmark_backbone(
+    *, device, dtype, compiled, batch_size, backbone, encoder_hidden_states, model
 ):
-    label = (
-        f"{model}, single pass transformer, batch_size: {batch_size}, dtype: {dtype}"
-    )
-    description = f"compiled {compiled}"
+    label = f"single pass backbone, batch_size: {batch_size}, dtype: {dtype}"
+    description = f"{model}, compiled {compiled}"
 
     print("*******")
     print(label)
@@ -75,7 +87,7 @@ def benchmark_transformer(
     )
 
     def benchmark_fn():
-        transformer(image_tokens, encoder_hidden_states=encoder_hidden_states)
+        backbone(image_tokens, encoder_hidden_states=encoder_hidden_states)
 
     if compiled:
         benchmark_fn()
@@ -92,7 +104,7 @@ def benchmark_transformer(
 
 
 def benchmark_vae(*, device, batch_size, dtype, compiled, vae):
-    label = f"{model}, single pass vae, batch_size: {batch_size}, dtype: {dtype}"
+    label = f"{muse_model}, single pass vae, batch_size: {batch_size}, dtype: {dtype}"
     description = f"compiled {compiled}"
 
     print("*******")
@@ -119,8 +131,9 @@ def benchmark_vae(*, device, batch_size, dtype, compiled, vae):
 
     return out
 
+
 def benchmark_full(*, device, batch_size, dtype, compiled, pipe):
-    label = f"{model}, full pipeline, batch_size: {batch_size}, dtype: {dtype}"
+    label = f"{muse_model}, full pipeline, batch_size: {batch_size}, dtype: {dtype}"
     description = f"compiled {compiled}"
 
     print("*******")
@@ -144,7 +157,7 @@ def benchmark_full(*, device, batch_size, dtype, compiled, pipe):
     return out
 
 
-transformer_params = {
+backbone_params = {
     "cuda": {
         "batch_size": [1, 2, 4, 8, 16, 32],
         "dtype": [torch.float16],
@@ -158,16 +171,16 @@ transformer_params = {
 }
 
 
-def main_transformer(device, file):
+def main_backbone(device, file):
     results = []
 
-    text_encoder = CLIPTextModel.from_pretrained(model, subfolder="text_encoder").to(
-        device
-    )
-    tokenizer = AutoTokenizer.from_pretrained(model, subfolder="text_encoder")
+    text_encoder = CLIPTextModel.from_pretrained(
+        muse_model, subfolder="text_encoder"
+    ).to(device)
+    tokenizer = AutoTokenizer.from_pretrained(muse_model, subfolder="text_encoder")
 
-    for dtype in transformer_params[device]["dtype"]:
-        for batch_size in transformer_params[device]["batch_size"]:
+    for dtype in backbone_params[device]["dtype"]:
+        for batch_size in backbone_params[device]["batch_size"]:
             encoder_hidden_states = make_encoder_hidden_states(
                 device=device,
                 dtype=dtype,
@@ -176,18 +189,33 @@ def main_transformer(device, file):
                 text_encoder=text_encoder,
             )
 
-            for compiled in transformer_params[device]["compiled"]:
-                transformer = make_transformer(
+            for compiled in backbone_params[device]["compiled"]:
+                muse_transformer = make_muse_transformer(
                     device=device, compiled=compiled, dtype=dtype
                 )
 
-                bm = benchmark_transformer(
+                bm = benchmark_backbone(
                     device=device,
                     dtype=dtype,
                     compiled=compiled,
                     batch_size=batch_size,
-                    transformer=transformer,
+                    backbone=muse_transformer,
                     encoder_hidden_states=encoder_hidden_states,
+                    model=muse_model,
+                )
+
+                results.append(bm)
+
+                sd_unet = make_sd_unet(device=device, compiled=compiled, dtype=dtype)
+
+                bm = benchmark_backbone(
+                    device=device,
+                    dtype=dtype,
+                    compiled=compiled,
+                    batch_size=batch_size,
+                    backbone=sd_unet,
+                    encoder_hidden_states=encoder_hidden_states,
+                    model=sd_model,
                 )
 
                 results.append(bm)
@@ -249,26 +277,29 @@ full_params = {
     },
 }
 
+
 def main_full(device, file):
     results = []
 
-    tokenizer = AutoTokenizer.from_pretrained(model, subfolder="text_encoder")
+    tokenizer = AutoTokenizer.from_pretrained(muse_model, subfolder="text_encoder")
 
     for dtype in vae_params[device]["dtype"]:
-        text_encoder = CLIPTextModel.from_pretrained(model, subfolder="text_encoder").to(
-            device=device, dtype=dtype
-        )
+        text_encoder = CLIPTextModel.from_pretrained(
+            muse_model, subfolder="text_encoder"
+        ).to(device=device, dtype=dtype)
 
         for batch_size in vae_params[device]["batch_size"]:
             for compiled in vae_params[device]["compiled"]:
                 vae = make_vae(device=device, compiled=compiled, dtype=dtype)
-                transformer = make_transformer(device=device, compiled=compiled, dtype=dtype)
+                muse_transformer = make_muse_transformer(
+                    device=device, compiled=compiled, dtype=dtype
+                )
 
                 pipe = PipelineMuse(
                     tokenizer=tokenizer,
                     text_encoder=text_encoder,
                     vae=vae,
-                    transformer=transformer
+                    transformer=muse_transformer,
                 )
                 pipe.device = device
                 pipe.dtype = dtype
@@ -300,8 +331,8 @@ args = parser.parse_args()
 if args.full:
     main_full(args.device, args.file)
 else:
-    if args.model == "transformer":
-        main_transformer(args.device, args.file)
+    if args.model == "backbone":
+        main_backbone(args.device, args.file)
     elif args.model == "vae":
         main_vae(args.device, args.file)
     else:
