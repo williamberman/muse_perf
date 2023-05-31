@@ -5,6 +5,7 @@ from transformers import CLIPTextModel, AutoTokenizer
 
 import torch
 from torch.utils.benchmark import Timer, Compare
+from argparse import ArgumentParser
 
 torch.manual_seed(0)
 torch.set_grad_enabled(False)
@@ -14,7 +15,7 @@ num_threads = torch.get_num_threads()
 model = "openMUSE/muse-cc12m-uvit-clip-130k"
 
 
-def make_encoder_hidden_states(*, device, dtype, batch_size):
+def make_encoder_hidden_states(*, device, dtype, batch_size, tokenizer, text_encoder):
     prompt = "A high tech solarpunk utopia in the Amazon rainforest"
 
     text_tokens = tokenizer(
@@ -72,7 +73,7 @@ def benchmark_transformer(
     )
 
     def benchmark_fn():
-        with torch.cuda.amp(enabled=autocast):
+        with torch.cuda.amp.autocast(enabled=autocast):
             transformer(image_tokens, encoder_hidden_states=encoder_hidden_states)
 
     if compiled:
@@ -80,7 +81,7 @@ def benchmark_transformer(
 
     out = Timer(
         stmt="benchmark_fn()",
-        setup="from __main__ import benchmark_fn",
+        globals={"benchmark_fn": benchmark_fn},
         num_threads=num_threads,
         label=label,
         description=description,
@@ -98,11 +99,11 @@ def benchmark_vae(*, batch_size, dtype, compiled, autocast, vae):
     print(description)
 
     image_tokens = torch.full(
-        (batch_size, 256), fill_value=5, dtype=torch.long, device=device, dtype=dtype
+        (batch_size, 256), fill_value=5, dtype=torch.long, device=device
     )
 
     def benchmark_fn():
-        with torch.cuda.amp(enabled=autocast):
+        with torch.cuda.amp.autocast(enabled=autocast):
             vae.decode_code(image_tokens)
 
     if compiled:
@@ -110,7 +111,7 @@ def benchmark_vae(*, batch_size, dtype, compiled, autocast, vae):
 
     out = Timer(
         stmt="benchmark_fn()",
-        setup="from __main__ import benchmark_fn",
+        globals={"benchmark_fn": benchmark_fn},
         num_threads=num_threads,
         label=label,
         description=description,
@@ -122,21 +123,22 @@ def benchmark_vae(*, batch_size, dtype, compiled, autocast, vae):
 params = {
     "cuda": {
         "batch_size": [1, 2, 4, 8, 16, 32],
-        "dtypes": [torch.float32, torch.float16],
+        "dtype": [torch.float32, torch.float16],
         "compiled": [False, True],
         "autocast": [False, True],
     },
     "cpu": {
         "batch_size": [1, 2, 4, 8],
-        "dtypes": [torch.float32, torch.float16],
+        "dtype": [torch.float32, torch.float16],
         "compiled": [False, True],
         "autocast": [False, True],
     },
 }
 
-results = []
 
-for device in ["cuda", "cpu"]:
+def main_transformer(device, file):
+    results = []
+
     text_encoder = CLIPTextModel.from_pretrained(model, subfolder="text_encoder").to(
         device
     )
@@ -144,13 +146,15 @@ for device in ["cuda", "cpu"]:
 
     for batch_size in params[device]["batch_size"]:
         for dtype in params[device]["dtype"]:
-
             encoder_hidden_states = make_encoder_hidden_states(
-                device=device, dtype=dtype, batch_size=batch_size
+                device=device,
+                dtype=dtype,
+                batch_size=batch_size,
+                tokenizer=tokenizer,
+                text_encoder=text_encoder,
             )
 
-            for compiled in params[device][dtype]:
-
+            for compiled in params[device]["compiled"]:
                 transformer = make_transformer(
                     device=device, compiled=compiled, dtype=dtype
                 )
@@ -168,11 +172,18 @@ for device in ["cuda", "cpu"]:
 
                     results.append(bm)
 
-for device in ["cuda", "cpu"]:
+    out = str(Compare(results))
+
+    with open(file) as f:
+        f.write(out)
+
+
+def main_vae(device, file):
+    results = []
+
     for batch_size in params[device]["batch_size"]:
         for dtype in params[device]["dtype"]:
-            for compiled in params[device][dtype]:
-
+            for compiled in params[device]["compiled"]:
                 vae = make_vae(device=device, compiled=compiled, dtype=dtype)
 
                 for autocast in params[device]["autocast"]:
@@ -187,5 +198,20 @@ for device in ["cuda", "cpu"]:
 
                     results.append(bm)
 
+    out = str(Compare(results))
 
-Compare(results).print()
+    with open(file) as f:
+        f.write(out)
+
+
+parser = ArgumentParser()
+parser.add_argument("--model", required=True)
+parser.add_argument("--device", required=True)
+parser.add_argument("--file", required=True)
+
+args = parser.parse_args()
+
+if args.model == "transformer":
+    main_transformer(args.device, args.file)
+elif args.model == "vae":
+    main_vae(args.device, args.file)
