@@ -120,7 +120,7 @@ def benchmark_vae(*, batch_size, dtype, compiled, autocast, vae):
     return out
 
 
-params = {
+transformer_params = {
     "cuda": {
         "batch_size": [1, 2, 4, 8, 16, 32],
         "dtype": [torch.float32, torch.float16],
@@ -129,7 +129,7 @@ params = {
     },
     "cpu": {
         "batch_size": [1, 2, 4, 8],
-        "dtype": [torch.float32, torch.float16],
+        "dtype": [torch.float32],
         "compiled": [False, True],
         "autocast": [False, True],
     },
@@ -144,8 +144,8 @@ def main_transformer(device, file):
     )
     tokenizer = AutoTokenizer.from_pretrained(model, subfolder="text_encoder")
 
-    for batch_size in params[device]["batch_size"]:
-        for dtype in params[device]["dtype"]:
+    for batch_size in transformer_params[device]["batch_size"]:
+        for dtype in transformer_params[device]["dtype"]:
             encoder_hidden_states = make_encoder_hidden_states(
                 device=device,
                 dtype=dtype,
@@ -154,12 +154,12 @@ def main_transformer(device, file):
                 text_encoder=text_encoder,
             )
 
-            for compiled in params[device]["compiled"]:
+            for compiled in transformer_params[device]["compiled"]:
                 transformer = make_transformer(
                     device=device, compiled=compiled, dtype=dtype
                 )
 
-                for autocast in params[device]["autocast"]:
+                for autocast in transformer_params[device]["autocast"]:
                     bm = benchmark_transformer(
                         device=device,
                         dtype=dtype,
@@ -178,15 +178,31 @@ def main_transformer(device, file):
         f.write(out)
 
 
+vae_params = {
+    "cuda": {
+        "batch_size": [1, 2, 4, 8, 16, 32],
+        "dtype": [torch.float32, torch.float16],
+        "compiled": [False, True],
+        "autocast": [False, True],
+    },
+    "cpu": {
+        "batch_size": [1, 2, 4, 8],
+        "dtype": [torch.float32, torch.float16],
+        "compiled": [False, True],
+        "autocast": [False, True],
+    },
+}
+
+
 def main_vae(device, file):
     results = []
 
-    for batch_size in params[device]["batch_size"]:
-        for dtype in params[device]["dtype"]:
-            for compiled in params[device]["compiled"]:
+    for batch_size in vae_params[device]["batch_size"]:
+        for dtype in vae_params[device]["dtype"]:
+            for compiled in vae_params[device]["compiled"]:
                 vae = make_vae(device=device, compiled=compiled, dtype=dtype)
 
-                for autocast in params[device]["autocast"]:
+                for autocast in vae_params[device]["autocast"]:
                     bm = benchmark_vae(
                         device=device,
                         dtype=dtype,
