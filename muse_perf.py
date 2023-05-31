@@ -270,6 +270,8 @@ def main_full(device, file):
                     vae=vae,
                     transformer=transformer
                 )
+                pipe.device = device
+                pipe.dtype = dtype
 
                 bm = benchmark_full(
                     device=device,
