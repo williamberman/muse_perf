@@ -61,8 +61,10 @@ def make_vae(*, device, compiled, dtype):
 def benchmark_transformer(
     *, device, dtype, compiled, batch_size, autocast, transformer, encoder_hidden_states
 ):
-    label = f"{model}, single pass transformer, batch_size: {batch_size}"
-    description = f"dtype: {dtype}, compiled {compiled}, autocast {autocast}"
+    label = (
+        f"{model}, single pass transformer, batch_size: {batch_size}, dtype: {dtype}"
+    )
+    description = f"compiled {compiled}, autocast {autocast}"
 
     print("*******")
     print(label)
@@ -91,8 +93,8 @@ def benchmark_transformer(
 
 
 def benchmark_vae(*, device, batch_size, dtype, compiled, autocast, vae):
-    label = f"{model}, single pass vae, batch_size: {batch_size}"
-    description = f"dtype: {dtype}, compiled {compiled}, autocast {autocast}"
+    label = f"{model}, single pass vae, batch_size: {batch_size}, dtype: {dtype}"
+    description = f"compiled {compiled}, autocast {autocast}"
 
     print("*******")
     print(label)
@@ -144,8 +146,8 @@ def main_transformer(device, file):
     )
     tokenizer = AutoTokenizer.from_pretrained(model, subfolder="text_encoder")
 
-    for batch_size in transformer_params[device]["batch_size"]:
-        for dtype in transformer_params[device]["dtype"]:
+    for dtype in transformer_params[device]["dtype"]:
+        for batch_size in transformer_params[device]["batch_size"]:
             encoder_hidden_states = make_encoder_hidden_states(
                 device=device,
                 dtype=dtype,
@@ -197,8 +199,8 @@ vae_params = {
 def main_vae(device, file):
     results = []
 
-    for batch_size in vae_params[device]["batch_size"]:
-        for dtype in vae_params[device]["dtype"]:
+    for dtype in vae_params[device]["dtype"]:
+        for batch_size in vae_params[device]["batch_size"]:
             for compiled in vae_params[device]["compiled"]:
                 vae = make_vae(device=device, compiled=compiled, dtype=dtype)
 
