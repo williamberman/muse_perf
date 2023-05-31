@@ -1,0 +1,27 @@
+[ openMUSE/muse-laiona6-uvit-clip-220k, full pipeline, batch_size: 1, dtype: torch.float32 ]
+                      |  compiled False  |  compiled True
+6 threads: ----------------------------------------------
+      benchmark_fn()  |       12.9       |       13.0    
+
+Times are in seconds (s).
+
+[ openMUSE/muse-laiona6-uvit-clip-220k, full pipeline, batch_size: 2, dtype: torch.float32 ]
+                      |  compiled False  |  compiled True
+6 threads: ----------------------------------------------
+      benchmark_fn()  |       22.1       |       22.1    
+
+Times are in seconds (s).
+
+[ openMUSE/muse-laiona6-uvit-clip-220k, full pipeline, batch_size: 4, dtype: torch.float32 ]
+                      |  compiled False  |  compiled True
+6 threads: ----------------------------------------------
+      benchmark_fn()  |       42.2       |       42.6    
+
+Times are in seconds (s).
+
+[ openMUSE/muse-laiona6-uvit-clip-220k, full pipeline, batch_size: 8, dtype: torch.float32 ]
+                      |  compiled False  |  compiled True
+6 threads: ----------------------------------------------
+      benchmark_fn()  |       82.6       |       82.5    
+
+Times are in seconds (s).

@@ -1,83 +1,41 @@
-[---------------------------- openMUSE/muse-cc12m-uvit-clip-130k, single pass transformer, batch_size: 1, dtype: torch.float32 ----------------------------]
-                      |  compiled False, autocast False  |  compiled False, autocast True  |  compiled True, autocast False  |  compiled True, autocast True
-6 threads: -------------------------------------------------------------------------------------------------------------------------------------------------
-      benchmark_fn()  |               26.5               |               36.0              |               21.6              |              28.7            
+[ openMUSE/muse-laiona6-uvit-clip-220k, single pass transformer, batch_size: 1, dtype: torch.float16 ]
+                      |  compiled False  |  compiled True
+6 threads: ----------------------------------------------
+      benchmark_fn()  |       21.2       |       15.0    
 
 Times are in milliseconds (ms).
 
-[---------------------------- openMUSE/muse-cc12m-uvit-clip-130k, single pass transformer, batch_size: 2, dtype: torch.float32 ----------------------------]
-                      |  compiled False, autocast False  |  compiled False, autocast True  |  compiled True, autocast False  |  compiled True, autocast True
-6 threads: -------------------------------------------------------------------------------------------------------------------------------------------------
-      benchmark_fn()  |               27.5               |               37.4              |               37.2              |              39.7            
+[ openMUSE/muse-laiona6-uvit-clip-220k, single pass transformer, batch_size: 2, dtype: torch.float16 ]
+                      |  compiled False  |  compiled True
+6 threads: ----------------------------------------------
+      benchmark_fn()  |       22.0       |       15.4    
 
 Times are in milliseconds (ms).
 
-[---------------------------- openMUSE/muse-cc12m-uvit-clip-130k, single pass transformer, batch_size: 4, dtype: torch.float32 ----------------------------]
-                      |  compiled False, autocast False  |  compiled False, autocast True  |  compiled True, autocast False  |  compiled True, autocast True
-6 threads: -------------------------------------------------------------------------------------------------------------------------------------------------
-      benchmark_fn()  |               28.4               |               39.3              |               30.8              |              41.8            
+[ openMUSE/muse-laiona6-uvit-clip-220k, single pass transformer, batch_size: 4, dtype: torch.float16 ]
+                      |  compiled False  |  compiled True
+6 threads: ----------------------------------------------
+      benchmark_fn()  |       24.1       |       29.7    
 
 Times are in milliseconds (ms).
 
-[---------------------------- openMUSE/muse-cc12m-uvit-clip-130k, single pass transformer, batch_size: 8, dtype: torch.float32 ----------------------------]
-                      |  compiled False, autocast False  |  compiled False, autocast True  |  compiled True, autocast False  |  compiled True, autocast True
-6 threads: -------------------------------------------------------------------------------------------------------------------------------------------------
-      benchmark_fn()  |               33.3               |               42.8              |               31.6              |              42.3            
+[ openMUSE/muse-laiona6-uvit-clip-220k, single pass transformer, batch_size: 8, dtype: torch.float16 ]
+                      |  compiled False  |  compiled True
+6 threads: ----------------------------------------------
+      benchmark_fn()  |       25.8       |       27.5    
 
 Times are in milliseconds (ms).
 
-[--------------------------- openMUSE/muse-cc12m-uvit-clip-130k, single pass transformer, batch_size: 16, dtype: torch.float32 ----------------------------]
-                      |  compiled False, autocast False  |  compiled False, autocast True  |  compiled True, autocast False  |  compiled True, autocast True
-6 threads: -------------------------------------------------------------------------------------------------------------------------------------------------
-      benchmark_fn()  |               61.5               |               44.1              |               58.5              |              43.9            
+[ openMUSE/muse-laiona6-uvit-clip-220k, single pass transformer, batch_size: 16, dtype: torch.float16 ]
+                      |  compiled False  |  compiled True
+6 threads: ----------------------------------------------
+      benchmark_fn()  |       33.9       |       31.7    
 
 Times are in milliseconds (ms).
 
-[--------------------------- openMUSE/muse-cc12m-uvit-clip-130k, single pass transformer, batch_size: 32, dtype: torch.float32 ----------------------------]
-                      |  compiled False, autocast False  |  compiled False, autocast True  |  compiled True, autocast False  |  compiled True, autocast True
-6 threads: -------------------------------------------------------------------------------------------------------------------------------------------------
-      benchmark_fn()  |              116.9               |               83.3              |              111.0              |              75.1            
-
-Times are in milliseconds (ms).
-
-[---------------------------- openMUSE/muse-cc12m-uvit-clip-130k, single pass transformer, batch_size: 1, dtype: torch.float16 ----------------------------]
-                      |  compiled False, autocast False  |  compiled False, autocast True  |  compiled True, autocast False  |  compiled True, autocast True
-6 threads: -------------------------------------------------------------------------------------------------------------------------------------------------
-      benchmark_fn()  |               30.8               |               32.5              |               29.9              |              31.4            
-
-Times are in milliseconds (ms).
-
-[---------------------------- openMUSE/muse-cc12m-uvit-clip-130k, single pass transformer, batch_size: 2, dtype: torch.float16 ----------------------------]
-                      |  compiled False, autocast False  |  compiled False, autocast True  |  compiled True, autocast False  |  compiled True, autocast True
-6 threads: -------------------------------------------------------------------------------------------------------------------------------------------------
-      benchmark_fn()  |               30.3               |               32.1              |               29.8              |              31.5            
-
-Times are in milliseconds (ms).
-
-[---------------------------- openMUSE/muse-cc12m-uvit-clip-130k, single pass transformer, batch_size: 4, dtype: torch.float16 ----------------------------]
-                      |  compiled False, autocast False  |  compiled False, autocast True  |  compiled True, autocast False  |  compiled True, autocast True
-6 threads: -------------------------------------------------------------------------------------------------------------------------------------------------
-      benchmark_fn()  |               32.5               |               33.8              |               31.4              |              33.4            
-
-Times are in milliseconds (ms).
-
-[---------------------------- openMUSE/muse-cc12m-uvit-clip-130k, single pass transformer, batch_size: 8, dtype: torch.float16 ----------------------------]
-                      |  compiled False, autocast False  |  compiled False, autocast True  |  compiled True, autocast False  |  compiled True, autocast True
-6 threads: -------------------------------------------------------------------------------------------------------------------------------------------------
-      benchmark_fn()  |               34.8               |               36.7              |               34.2              |              35.5            
-
-Times are in milliseconds (ms).
-
-[--------------------------- openMUSE/muse-cc12m-uvit-clip-130k, single pass transformer, batch_size: 16, dtype: torch.float16 ----------------------------]
-                      |  compiled False, autocast False  |  compiled False, autocast True  |  compiled True, autocast False  |  compiled True, autocast True
-6 threads: -------------------------------------------------------------------------------------------------------------------------------------------------
-      benchmark_fn()  |               36.7               |               38.2              |               35.8              |              38.3            
-
-Times are in milliseconds (ms).
-
-[--------------------------- openMUSE/muse-cc12m-uvit-clip-130k, single pass transformer, batch_size: 32, dtype: torch.float16 ----------------------------]
-                      |  compiled False, autocast False  |  compiled False, autocast True  |  compiled True, autocast False  |  compiled True, autocast True
-6 threads: -------------------------------------------------------------------------------------------------------------------------------------------------
-      benchmark_fn()  |               68.8               |               75.5              |               64.0              |              67.6            
+[ openMUSE/muse-laiona6-uvit-clip-220k, single pass transformer, batch_size: 32, dtype: torch.float16 ]
+                      |  compiled False  |  compiled True
+6 threads: ----------------------------------------------
+      benchmark_fn()  |       67.8       |       62.8    
 
 Times are in milliseconds (ms).
