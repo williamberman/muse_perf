@@ -174,7 +174,7 @@ def main_transformer(device, file):
 
     out = str(Compare(results))
 
-    with open(file) as f:
+    with open(file, "w") as f:
         f.write(out)
 
 
@@ -200,7 +200,7 @@ def main_vae(device, file):
 
     out = str(Compare(results))
 
-    with open(file) as f:
+    with open(file, "w") as f:
         f.write(out)
 
 
