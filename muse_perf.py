@@ -289,7 +289,7 @@ def main_full(device, file):
 
 parser = ArgumentParser()
 parser.add_argument("--model", required=False)
-parser.add_argument("--full", required=False, type="store_true")
+parser.add_argument("--full", required=False, action="store_true")
 parser.add_argument("--device", required=True)
 parser.add_argument("--file", required=True)
 
