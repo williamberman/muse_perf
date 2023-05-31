@@ -59,12 +59,12 @@ def make_vae(*, device, compiled, dtype):
 
 
 def benchmark_transformer(
-    *, device, dtype, compiled, batch_size, autocast, transformer, encoder_hidden_states
+    *, device, dtype, compiled, batch_size, transformer, encoder_hidden_states
 ):
     label = (
         f"{model}, single pass transformer, batch_size: {batch_size}, dtype: {dtype}"
     )
-    description = f"compiled {compiled}, autocast {autocast}"
+    description = f"compiled {compiled}"
 
     print("*******")
     print(label)
@@ -75,8 +75,7 @@ def benchmark_transformer(
     )
 
     def benchmark_fn():
-        with torch.cuda.amp.autocast(enabled=autocast):
-            transformer(image_tokens, encoder_hidden_states=encoder_hidden_states)
+        transformer(image_tokens, encoder_hidden_states=encoder_hidden_states)
 
     if compiled:
         benchmark_fn()
@@ -92,9 +91,9 @@ def benchmark_transformer(
     return out
 
 
-def benchmark_vae(*, device, batch_size, dtype, compiled, autocast, vae):
+def benchmark_vae(*, device, batch_size, dtype, compiled, vae):
     label = f"{model}, single pass vae, batch_size: {batch_size}, dtype: {dtype}"
-    description = f"compiled {compiled}, autocast {autocast}"
+    description = f"compiled {compiled}"
 
     print("*******")
     print(label)
@@ -105,8 +104,7 @@ def benchmark_vae(*, device, batch_size, dtype, compiled, autocast, vae):
     )
 
     def benchmark_fn():
-        with torch.cuda.amp.autocast(enabled=autocast):
-            vae.decode_code(image_tokens)
+        vae.decode_code(image_tokens)
 
     if compiled:
         benchmark_fn()
@@ -125,15 +123,13 @@ def benchmark_vae(*, device, batch_size, dtype, compiled, autocast, vae):
 transformer_params = {
     "cuda": {
         "batch_size": [1, 2, 4, 8, 16, 32],
-        "dtype": [torch.float32, torch.float16],
+        "dtype": [torch.float16],
         "compiled": [False, True],
-        "autocast": [False, True],
     },
     "cpu": {
         "batch_size": [1, 2, 4, 8],
         "dtype": [torch.float32],
         "compiled": [False, True],
-        "autocast": [False, True],
     },
 }
 
@@ -161,18 +157,16 @@ def main_transformer(device, file):
                     device=device, compiled=compiled, dtype=dtype
                 )
 
-                for autocast in transformer_params[device]["autocast"]:
-                    bm = benchmark_transformer(
-                        device=device,
-                        dtype=dtype,
-                        compiled=compiled,
-                        batch_size=batch_size,
-                        autocast=autocast,
-                        transformer=transformer,
-                        encoder_hidden_states=encoder_hidden_states,
-                    )
+                bm = benchmark_transformer(
+                    device=device,
+                    dtype=dtype,
+                    compiled=compiled,
+                    batch_size=batch_size,
+                    transformer=transformer,
+                    encoder_hidden_states=encoder_hidden_states,
+                )
 
-                    results.append(bm)
+                results.append(bm)
 
     out = str(Compare(results))
 
@@ -183,15 +177,13 @@ def main_transformer(device, file):
 vae_params = {
     "cuda": {
         "batch_size": [1, 2, 4, 8, 16, 32],
-        "dtype": [torch.float32, torch.float16],
+        "dtype": [torch.float16],
         "compiled": [False, True],
-        "autocast": [False, True],
     },
     "cpu": {
         "batch_size": [1, 2, 4, 8],
         "dtype": [torch.float32],
         "compiled": [False, True],
-        "autocast": [False, True],
     },
 }
 
@@ -204,17 +196,15 @@ def main_vae(device, file):
             for compiled in vae_params[device]["compiled"]:
                 vae = make_vae(device=device, compiled=compiled, dtype=dtype)
 
-                for autocast in vae_params[device]["autocast"]:
-                    bm = benchmark_vae(
-                        device=device,
-                        dtype=dtype,
-                        compiled=compiled,
-                        batch_size=batch_size,
-                        autocast=autocast,
-                        vae=vae,
-                    )
+                bm = benchmark_vae(
+                    device=device,
+                    dtype=dtype,
+                    compiled=compiled,
+                    batch_size=batch_size,
+                    vae=vae,
+                )
 
-                    results.append(bm)
+                results.append(bm)
 
     out = str(Compare(results))
 
