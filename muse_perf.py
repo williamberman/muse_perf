@@ -119,7 +119,7 @@ def benchmark_vae(*, device, batch_size, dtype, compiled, vae):
 
     return out
 
-def benchmark_full(*, batch_size, dtype, compiled, pipe):
+def benchmark_full(*, device, batch_size, dtype, compiled, pipe):
     label = f"{model}, full pipeline, batch_size: {batch_size}, dtype: {dtype}"
     description = f"compiled {compiled}"
 
