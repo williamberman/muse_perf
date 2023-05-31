@@ -187,7 +187,7 @@ vae_params = {
     },
     "cpu": {
         "batch_size": [1, 2, 4, 8],
-        "dtype": [torch.float32, torch.float16],
+        "dtype": [torch.float32],
         "compiled": [False, True],
         "autocast": [False, True],
     },
