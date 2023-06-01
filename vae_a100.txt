@@ -1,41 +1,41 @@
-[ openMUSE/muse-laiona6-uvit-clip-220k, single pass vae, batch_size: 1, dtype: torch.float16 ]
-                      |  compiled False  |  compiled True
-6 threads: ----------------------------------------------
-      benchmark_fn()  |       10.3       |       9.3     
+[----------------------------------------------------------------------------------------- single pass vae, batch_size: 1, dtype: torch.float16 -----------------------------------------------------------------------------------------]
+                      |  openMUSE/muse-laiona6-uvit-clip-220k, compiled False  |  runwayml/stable-diffusion-v1-5, compiled False  |  openMUSE/muse-laiona6-uvit-clip-220k, compiled True  |  runwayml/stable-diffusion-v1-5, compiled True
+6 threads: -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      benchmark_fn()  |                          10.3                          |                       37.8                       |                          9.3                          |                       37.8                    
 
 Times are in milliseconds (ms).
 
-[ openMUSE/muse-laiona6-uvit-clip-220k, single pass vae, batch_size: 2, dtype: torch.float16 ]
-                      |  compiled False  |  compiled True
-6 threads: ----------------------------------------------
-      benchmark_fn()  |       14.3       |       14.3    
+[----------------------------------------------------------------------------------------- single pass vae, batch_size: 2, dtype: torch.float16 -----------------------------------------------------------------------------------------]
+                      |  openMUSE/muse-laiona6-uvit-clip-220k, compiled False  |  runwayml/stable-diffusion-v1-5, compiled False  |  openMUSE/muse-laiona6-uvit-clip-220k, compiled True  |  runwayml/stable-diffusion-v1-5, compiled True
+6 threads: -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      benchmark_fn()  |                          14.8                          |                       76.8                       |                          14.3                         |                       76.5                    
 
 Times are in milliseconds (ms).
 
-[ openMUSE/muse-laiona6-uvit-clip-220k, single pass vae, batch_size: 4, dtype: torch.float16 ]
-                      |  compiled False  |  compiled True
-6 threads: ----------------------------------------------
-      benchmark_fn()  |       23.7       |       23.7    
+[----------------------------------------------------------------------------------------- single pass vae, batch_size: 4, dtype: torch.float16 -----------------------------------------------------------------------------------------]
+                      |  openMUSE/muse-laiona6-uvit-clip-220k, compiled False  |  runwayml/stable-diffusion-v1-5, compiled False  |  openMUSE/muse-laiona6-uvit-clip-220k, compiled True  |  runwayml/stable-diffusion-v1-5, compiled True
+6 threads: -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      benchmark_fn()  |                          23.8                          |                      139.2                       |                          23.8                         |                      139.0                    
 
 Times are in milliseconds (ms).
 
-[ openMUSE/muse-laiona6-uvit-clip-220k, single pass vae, batch_size: 8, dtype: torch.float16 ]
-                      |  compiled False  |  compiled True
-6 threads: ----------------------------------------------
-      benchmark_fn()  |       41.3       |       41.4    
+[----------------------------------------------------------------------------------------- single pass vae, batch_size: 8, dtype: torch.float16 -----------------------------------------------------------------------------------------]
+                      |  openMUSE/muse-laiona6-uvit-clip-220k, compiled False  |  runwayml/stable-diffusion-v1-5, compiled False  |  openMUSE/muse-laiona6-uvit-clip-220k, compiled True  |  runwayml/stable-diffusion-v1-5, compiled True
+6 threads: -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      benchmark_fn()  |                          41.6                          |                      261.4                       |                          41.6                         |                      261.7                    
 
 Times are in milliseconds (ms).
 
-[ openMUSE/muse-laiona6-uvit-clip-220k, single pass vae, batch_size: 16, dtype: torch.float16 ]
-                      |  compiled False  |  compiled True
-6 threads: ----------------------------------------------
-      benchmark_fn()  |       79.1       |       78.8    
+[---------------------------------------------------------------------------------------- single pass vae, batch_size: 16, dtype: torch.float16 -----------------------------------------------------------------------------------------]
+                      |  openMUSE/muse-laiona6-uvit-clip-220k, compiled False  |  runwayml/stable-diffusion-v1-5, compiled False  |  openMUSE/muse-laiona6-uvit-clip-220k, compiled True  |  runwayml/stable-diffusion-v1-5, compiled True
+6 threads: -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      benchmark_fn()  |                          79.3                          |                      519.1                       |                          79.2                         |                      519.5                    
 
 Times are in milliseconds (ms).
 
-[ openMUSE/muse-laiona6-uvit-clip-220k, single pass vae, batch_size: 32, dtype: torch.float16 ]
-                      |  compiled False  |  compiled True
-6 threads: ----------------------------------------------
-      benchmark_fn()  |      152.9       |      153.1    
+[---------------------------------------------------------------------------------------- single pass vae, batch_size: 32, dtype: torch.float16 -----------------------------------------------------------------------------------------]
+                      |  openMUSE/muse-laiona6-uvit-clip-220k, compiled False  |  runwayml/stable-diffusion-v1-5, compiled False  |  openMUSE/muse-laiona6-uvit-clip-220k, compiled True  |  runwayml/stable-diffusion-v1-5, compiled True
+6 threads: -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      benchmark_fn()  |                         153.6                          |                      1093.5                      |                         153.9                         |                      1092.5                   
 
 Times are in milliseconds (ms).
