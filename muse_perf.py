@@ -51,8 +51,8 @@ def make_muse_transformer(*, device, compiled, dtype):
 
     transformer = transformer.to(device=device, dtype=dtype)
 
-    if compiled:
-        transformer = torch.compile(transformer, mode="reduce-overhead", fullgraph=True)
+    if compiled is not None:
+        transformer = torch.compile(transformer, mode=compiled)
 
     return transformer
 
@@ -62,8 +62,8 @@ def make_sd_unet(*, device, compiled, dtype):
 
     unet = unet.to(device=device, dtype=dtype)
 
-    if compiled:
-        unet = torch.compile(unet, mode="reduce-overhead", fullgraph=True)
+    if compiled is not None:
+        unet = torch.compile(unet, mode=compiled)
 
     return unet
 
@@ -73,8 +73,8 @@ def make_muse_vae(*, device, compiled, dtype):
 
     vae = vae.to(device=device, dtype=dtype)
 
-    if compiled:
-        vae = torch.compile(vae, mode="reduce-overhead", fullgraph=True)
+    if compiled is not None:
+        vae = torch.compile(vae, mode=compiled)
 
     return vae
 
@@ -84,8 +84,8 @@ def make_sd_vae(*, device, compiled, dtype):
 
     vae = vae.to(device=device, dtype=dtype)
 
-    if compiled:
-        vae = torch.compile(vae, mode="reduce-overhead", fullgraph=True)
+    if compiled is not None:
+        vae = torch.compile(vae, mode=compiled)
 
     return vae
 
@@ -107,8 +107,7 @@ def benchmark_transformer_backbone(
     def benchmark_fn():
         transformer(image_tokens, encoder_hidden_states=encoder_hidden_states)
 
-    if compiled:
-        benchmark_fn()
+    benchmark_fn()
 
     out = Timer(
         stmt="benchmark_fn()",
@@ -138,8 +137,7 @@ def benchmark_unet_backbone(
     def benchmark_fn():
         unet(latent_image, timestep=t, encoder_hidden_states=encoder_hidden_states)
 
-    if compiled:
-        benchmark_fn()
+    benchmark_fn()
 
     out = Timer(
         stmt="benchmark_fn()",
@@ -167,8 +165,7 @@ def benchmark_muse_vae(*, device, batch_size, dtype, compiled, vae):
     def benchmark_fn():
         vae.decode_code(image_tokens)
 
-    if compiled:
-        benchmark_fn()
+    benchmark_fn()
 
     out = Timer(
         stmt="benchmark_fn()",
@@ -194,8 +191,7 @@ def benchmark_sd_vae(*, device, batch_size, dtype, compiled, vae):
     def benchmark_fn():
         vae.decode(latent_image)
 
-    if compiled:
-        benchmark_fn()
+    benchmark_fn()
 
     out = Timer(
         stmt="benchmark_fn()",
@@ -219,8 +215,7 @@ def benchmark_muse_full(*, device, batch_size, dtype, compiled, pipe):
     def benchmark_fn():
         pipe(prompt, num_images_per_prompt=batch_size, timesteps=12)
 
-    if compiled:
-        benchmark_fn()
+    pipe(prompt, num_images_per_prompt=batch_size, timesteps=5)
 
     out = Timer(
         stmt="benchmark_fn()",
@@ -244,8 +239,7 @@ def benchmark_sd_full(*, device, batch_size, dtype, compiled, pipe):
     def benchmark_fn():
         pipe(prompt, num_images_per_prompt=batch_size, num_inference_steps=20)
 
-    if compiled:
-        benchmark_fn()
+    pipe(prompt, num_images_per_prompt=batch_size, num_inference_steps=5)
 
     out = Timer(
         stmt="benchmark_fn()",
@@ -262,12 +256,12 @@ backbone_params = {
     "cuda": {
         "batch_size": [1, 2, 4, 8, 16, 32],
         "dtype": [torch.float16],
-        "compiled": [False, True],
+        "compiled": [None, "default", "reduce-overhead"],
     },
     "cpu": {
         "batch_size": [1, 2, 4, 8],
         "dtype": [torch.float32],
-        "compiled": [False, True],
+        "compiled": [None, "default", "reduce-overhead"],
     },
 }
 
@@ -338,12 +332,12 @@ vae_params = {
     "cuda": {
         "batch_size": [1, 2, 4, 8, 16, 32],
         "dtype": [torch.float16],
-        "compiled": [False, True],
+        "compiled": [None, "default", "reduce-overhead"],
     },
     "cpu": {
         "batch_size": [1, 2, 4, 8],
         "dtype": [torch.float32],
-        "compiled": [False, True],
+        "compiled": [None, "default", "reduce-overhead"],
     },
 }
 
@@ -392,12 +386,12 @@ full_params = {
     "cuda": {
         "batch_size": [1, 2, 4, 8, 16, 32],
         "dtype": [torch.float16],
-        "compiled": [False, True],
+        "compiled": [None, "default", "reduce-overhead"],
     },
     "cpu": {
         "batch_size": [1, 2, 4, 8],
         "dtype": [torch.float32],
-        "compiled": [False, True],
+        "compiled": [None, "default", "reduce-overhead"],
     },
 }
 
@@ -476,13 +470,13 @@ def main_full(device, file, batch_size=None, dtype=None, compiled=None):
         f.write(out)
 
 
-def bool_parser(string):
-    if string == "True":
-        return True
-    elif string == "False":
-        return False
+def compiled_parser(string):
+    if string in ["default", "reduce-overhead"]:
+        return string
+    elif string == "None":
+        return None
     else:
-        assert False
+        assert False, f"{string} can't parse as compiled option"
 
 
 parser = ArgumentParser()
@@ -492,7 +486,7 @@ parser.add_argument("--device", required=True)
 parser.add_argument("--file", required=True)
 parser.add_argument("--batch_size", required=False, nargs="+", type=int)
 parser.add_argument("--dtype", required=False, nargs="+")
-parser.add_argument("--compiled", required=False, nargs="+", type=bool_parser)
+parser.add_argument("--compiled", required=False, nargs="+", type=compiled_parser)
 
 args = parser.parse_args()
 
