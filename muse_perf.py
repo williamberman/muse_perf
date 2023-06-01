@@ -72,8 +72,8 @@ def make_vae(*, device, compiled, dtype):
     return vae
 
 
-def benchmark_backbone(
-    *, device, dtype, compiled, batch_size, backbone, encoder_hidden_states, model
+def benchmark_transformer_backbone(
+    *, device, dtype, compiled, batch_size, transformer, encoder_hidden_states, model
 ):
     label = f"single pass backbone, batch_size: {batch_size}, dtype: {dtype}"
     description = f"{model}, compiled {compiled}"
@@ -87,7 +87,37 @@ def benchmark_backbone(
     )
 
     def benchmark_fn():
-        backbone(image_tokens, encoder_hidden_states=encoder_hidden_states)
+        transformer(image_tokens, encoder_hidden_states=encoder_hidden_states)
+
+    if compiled:
+        benchmark_fn()
+
+    out = Timer(
+        stmt="benchmark_fn()",
+        globals={"benchmark_fn": benchmark_fn},
+        num_threads=num_threads,
+        label=label,
+        description=description,
+    ).blocked_autorange(min_run_time=1)
+
+    return out
+
+def benchmark_unet_backbone(
+    *, device, dtype, compiled, batch_size, unet, encoder_hidden_states, model
+):
+    label = f"single pass backbone, batch_size: {batch_size}, dtype: {dtype}"
+    description = f"{model}, compiled {compiled}"
+
+    print("*******")
+    print(label)
+    print(description)
+
+    latent_image = torch.randn((batch_size, 4, 64, 64), dtype=dtype, device=device)
+
+    t = torch.randint(1, 999, (batch_size,), dtype=dtype, device=device)
+
+    def benchmark_fn():
+        unet(latent_image, timestep=t, encoder_hidden_states=encoder_hidden_states)
 
     if compiled:
         benchmark_fn()
@@ -194,12 +224,12 @@ def main_backbone(device, file):
                     device=device, compiled=compiled, dtype=dtype
                 )
 
-                bm = benchmark_backbone(
+                bm = benchmark_transformer_backbone(
                     device=device,
                     dtype=dtype,
                     compiled=compiled,
                     batch_size=batch_size,
-                    backbone=muse_transformer,
+                    transformer=muse_transformer,
                     encoder_hidden_states=encoder_hidden_states,
                     model=muse_model,
                 )
@@ -208,12 +238,12 @@ def main_backbone(device, file):
 
                 sd_unet = make_sd_unet(device=device, compiled=compiled, dtype=dtype)
 
-                bm = benchmark_backbone(
+                bm = benchmark_unet_backbone(
                     device=device,
                     dtype=dtype,
                     compiled=compiled,
                     batch_size=batch_size,
-                    backbone=sd_unet,
+                    unet=sd_unet,
                     encoder_hidden_states=encoder_hidden_states,
                     model=sd_model,
                 )
