@@ -387,13 +387,13 @@ def main_full(device, file):
 
     tokenizer = CLIPTokenizer.from_pretrained(muse_model, subfolder="text_encoder")
 
-    for dtype in vae_params[device]["dtype"]:
+    for dtype in full_params[device]["dtype"]:
         text_encoder = CLIPTextModel.from_pretrained(
             muse_model, subfolder="text_encoder"
         ).to(device=device, dtype=dtype)
 
-        for batch_size in vae_params[device]["batch_size"]:
-            for compiled in vae_params[device]["compiled"]:
+        for batch_size in full_params[device]["batch_size"]:
+            for compiled in full_params[device]["compiled"]:
                 muse_vae = make_muse_vae(device=device, compiled=compiled, dtype=dtype)
                 muse_transformer = make_muse_transformer(
                     device=device, compiled=compiled, dtype=dtype
@@ -417,6 +417,10 @@ def main_full(device, file):
                 )
 
                 results.append(bm)
+
+                # skip for stable diffusion
+                if batch_size > 1 and device == 'cpu':
+                    continue
 
                 sd_vae = make_sd_vae(device=device, compiled=compiled, dtype=dtype)
                 sd_unet = make_sd_unet(device=device, compiled=compiled, dtype=dtype)
