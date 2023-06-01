@@ -2,7 +2,7 @@ from muse.modeling_taming_vqgan import VQGANModel
 from muse.modeling_transformer import MaskGiTUViT
 from muse import PipelineMuse
 
-from transformers import CLIPTextModel, AutoTokenizer
+from transformers import CLIPTextModel, AutoTokenizer, CLIPTokenizer
 
 from diffusers import UNet2DConditionModel, AutoencoderKL, StableDiffusionPipeline
 
@@ -235,7 +235,7 @@ def benchmark_sd_full(*, device, batch_size, dtype, compiled, pipe):
     print(description)
 
     def benchmark_fn():
-        pipe(prompt, num_images_per_prompt=batch_size, timesteps=20)
+        pipe(prompt, num_images_per_prompt=batch_size, num_inference_steps=20)
 
     if compiled:
         benchmark_fn()
@@ -385,7 +385,7 @@ full_params = {
 def main_full(device, file):
     results = []
 
-    tokenizer = AutoTokenizer.from_pretrained(muse_model, subfolder="text_encoder")
+    tokenizer = CLIPTokenizer.from_pretrained(muse_model, subfolder="text_encoder")
 
     for dtype in vae_params[device]["dtype"]:
         text_encoder = CLIPTextModel.from_pretrained(
