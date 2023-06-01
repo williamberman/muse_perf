@@ -265,7 +265,7 @@ backbone_params = {
 }
 
 
-def main_backbone(device, file):
+def main_backbone(device, file, batch_size=None, dtype=None, compiled=None):
     results = []
 
     text_encoder = CLIPTextModel.from_pretrained(
@@ -273,8 +273,12 @@ def main_backbone(device, file):
     ).to(device)
     tokenizer = AutoTokenizer.from_pretrained(muse_model, subfolder="text_encoder")
 
-    for dtype in backbone_params[device]["dtype"]:
-        for batch_size in backbone_params[device]["batch_size"]:
+    dtype_ = dtype or backbone_params[device]["dtype"]
+    batch_size_ = batch_size or backbone_params[device]["batch_size"]
+    compiled_ = compiled or backbone_params[device]["compiled"]
+
+    for dtype in dtype_:
+        for batch_size in batch_size_:
             encoder_hidden_states = make_encoder_hidden_states(
                 device=device,
                 dtype=dtype,
@@ -283,7 +287,7 @@ def main_backbone(device, file):
                 text_encoder=text_encoder,
             )
 
-            for compiled in backbone_params[device]["compiled"]:
+            for compiled in compiled_:
                 muse_transformer = make_muse_transformer(
                     device=device, compiled=compiled, dtype=dtype
                 )
@@ -314,7 +318,7 @@ def main_backbone(device, file):
 
     out = str(Compare(results))
 
-    with open(file, "w") as f:
+    with open(file, "a") as f:
         f.write(out)
 
 
@@ -332,12 +336,16 @@ vae_params = {
 }
 
 
-def main_vae(device, file):
+def main_vae(device, file, dtype=None, batch_size=None, compiled=None):
     results = []
 
-    for dtype in vae_params[device]["dtype"]:
-        for batch_size in vae_params[device]["batch_size"]:
-            for compiled in vae_params[device]["compiled"]:
+    dtype_ = dtype or vae_params[device]["dtype"]
+    batch_size_ = batch_size or vae_params[device]["batch_size"]
+    compiled_ = compiled or vae_params[device]["compiled"]
+
+    for dtype in dtype_:
+        for batch_size in batch_size_:
+            for compiled in compiled_:
                 muse_vae = make_muse_vae(device=device, compiled=compiled, dtype=dtype)
 
                 bm = benchmark_muse_vae(
@@ -364,7 +372,7 @@ def main_vae(device, file):
 
     out = str(Compare(results))
 
-    with open(file, "w") as f:
+    with open(file, "a") as f:
         f.write(out)
 
 
@@ -382,18 +390,22 @@ full_params = {
 }
 
 
-def main_full(device, file):
+def main_full(device, file, batch_size=None, dtype=None, compiled=None):
     results = []
 
     tokenizer = CLIPTokenizer.from_pretrained(muse_model, subfolder="text_encoder")
 
-    for dtype in full_params[device]["dtype"]:
+    dtype_ = dtype or full_params[device]["dtype"]
+    batch_size_ = batch_size or full_params[device]["batch_size"]
+    compiled_ = compiled or full_params[device]["compiled"]
+
+    for dtype in dtype_:
         text_encoder = CLIPTextModel.from_pretrained(
             muse_model, subfolder="text_encoder"
         ).to(device=device, dtype=dtype)
 
-        for batch_size in full_params[device]["batch_size"]:
-            for compiled in full_params[device]["compiled"]:
+        for batch_size in batch_size_:
+            for compiled in compiled_:
                 muse_vae = make_muse_vae(device=device, compiled=compiled, dtype=dtype)
                 muse_transformer = make_muse_transformer(
                     device=device, compiled=compiled, dtype=dtype
@@ -419,7 +431,7 @@ def main_full(device, file):
                 results.append(bm)
 
                 # skip for stable diffusion
-                if batch_size > 1 and device == 'cpu':
+                if batch_size > 1 and device == "cpu":
                     continue
 
                 sd_vae = make_sd_vae(device=device, compiled=compiled, dtype=dtype)
@@ -446,8 +458,17 @@ def main_full(device, file):
 
     out = str(Compare(results))
 
-    with open(file, "w") as f:
+    with open(file, "a") as f:
         f.write(out)
+
+
+def bool_parser(string):
+    if string == "True":
+        return True
+    elif string == "False":
+        return False
+    else:
+        assert False
 
 
 parser = ArgumentParser()
@@ -455,15 +476,48 @@ parser.add_argument("--model", required=False)
 parser.add_argument("--full", required=False, action="store_true")
 parser.add_argument("--device", required=True)
 parser.add_argument("--file", required=True)
+parser.add_argument("--batch_size", required=False, nargs="+", type=int)
+parser.add_argument("--dtype", required=False, nargs="+")
+parser.add_argument("--compiled", required=False, nargs="+", type=bool_parser)
 
 args = parser.parse_args()
 
+if args.dtype is not None:
+    dtypes = []
+    for dtype in args.dtype:
+        if dtype == "float32":
+            dtypes.append(torch.float32)
+        elif dtype == "float16":
+            dtypes.append(torch.float16)
+        else:
+            assert False
+else:
+    dtypes = None
+
 if args.full:
-    main_full(args.device, args.file)
+    main_full(
+        args.device,
+        args.file,
+        batch_size=args.batch_size,
+        dtype=dtypes,
+        compiled=args.compiled,
+    )
 else:
     if args.model == "backbone":
-        main_backbone(args.device, args.file)
+        main_backbone(
+            args.device,
+            args.file,
+            batch_size=args.batch_size,
+            dtype=dtypes,
+            compiled=args.compiled,
+        )
     elif args.model == "vae":
-        main_vae(args.device, args.file)
+        main_vae(
+            args.device,
+            args.file,
+            batch_size=args.batch_size,
+            dtype=dtypes,
+            compiled=args.compiled,
+        )
     else:
         assert False
