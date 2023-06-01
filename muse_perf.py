@@ -15,9 +15,14 @@ torch.set_grad_enabled(False)
 torch.set_float32_matmul_precision("high")
 
 num_threads = torch.get_num_threads()
-muse_model = "openMUSE/muse-laiona6-uvit-clip-220k"
-sd_model = "runwayml/stable-diffusion-v1-5"
 prompt = "A high tech solarpunk utopia in the Amazon rainforest"
+
+all_models = {
+    "muse_f16": "openMUSE/muse-laiona6-uvit-clip-220k",
+    "sd": "runwayml/stable-diffusion-v1-5",
+    # TODO
+    # "muse_f8": "laiona6plus_uvit_clip_f8"
+}
 
 
 def make_encoder_hidden_states(*, device, dtype, batch_size, tokenizer, text_encoder):
@@ -40,45 +45,47 @@ def make_encoder_hidden_states(*, device, dtype, batch_size, tokenizer, text_enc
 
 
 def make_muse_transformer(*, device, compiled, dtype):
-    transformer = MaskGiTUViT.from_pretrained(muse_model, subfolder="transformer")
+    transformer = MaskGiTUViT.from_pretrained(
+        all_models["muse_f16"], subfolder="transformer"
+    )
 
     transformer = transformer.to(device=device, dtype=dtype)
 
     if compiled:
-        transformer = torch.compile(transformer)
+        transformer = torch.compile(transformer, mode="reduce-overhead", fullgraph=True)
 
     return transformer
 
 
 def make_sd_unet(*, device, compiled, dtype):
-    unet = UNet2DConditionModel.from_pretrained(sd_model, subfolder="unet")
+    unet = UNet2DConditionModel.from_pretrained(all_models["sd"], subfolder="unet")
 
     unet = unet.to(device=device, dtype=dtype)
 
     if compiled:
-        unet = torch.compile(unet)
+        unet = torch.compile(unet, mode="reduce-overhead", fullgraph=True)
 
     return unet
 
 
 def make_muse_vae(*, device, compiled, dtype):
-    vae = VQGANModel.from_pretrained(muse_model, subfolder="vae")
+    vae = VQGANModel.from_pretrained(all_models["muse_f16"], subfolder="vae")
 
     vae = vae.to(device=device, dtype=dtype)
 
     if compiled:
-        vae = torch.compile(vae)
+        vae = torch.compile(vae, mode="reduce-overhead", fullgraph=True)
 
     return vae
 
 
 def make_sd_vae(*, device, compiled, dtype):
-    vae = AutoencoderKL.from_pretrained(sd_model, subfolder="vae")
+    vae = AutoencoderKL.from_pretrained(all_models["sd"], subfolder="vae")
 
     vae = vae.to(device=device, dtype=dtype)
 
     if compiled:
-        vae = torch.compile(vae)
+        vae = torch.compile(vae, mode="reduce-overhead", fullgraph=True)
 
     return vae
 
@@ -87,7 +94,7 @@ def benchmark_transformer_backbone(
     *, device, dtype, compiled, batch_size, transformer, encoder_hidden_states
 ):
     label = f"single pass backbone, batch_size: {batch_size}, dtype: {dtype}"
-    description = f"{muse_model}, compiled {compiled}"
+    description = f"{all_models['muse_f16']}, compiled {compiled}"
 
     print("*******")
     print(label)
@@ -118,7 +125,7 @@ def benchmark_unet_backbone(
     *, device, dtype, compiled, batch_size, unet, encoder_hidden_states
 ):
     label = f"single pass backbone, batch_size: {batch_size}, dtype: {dtype}"
-    description = f"{sd_model}, compiled {compiled}"
+    description = f"{all_models['sd']}, compiled {compiled}"
 
     print("*******")
     print(label)
@@ -147,7 +154,7 @@ def benchmark_unet_backbone(
 
 def benchmark_muse_vae(*, device, batch_size, dtype, compiled, vae):
     label = f"single pass vae, batch_size: {batch_size}, dtype: {dtype}"
-    description = f"{muse_model}, compiled {compiled}"
+    description = f"{all_models['muse_f16']}, compiled {compiled}"
 
     print("*******")
     print(label)
@@ -176,7 +183,7 @@ def benchmark_muse_vae(*, device, batch_size, dtype, compiled, vae):
 
 def benchmark_sd_vae(*, device, batch_size, dtype, compiled, vae):
     label = f"single pass vae, batch_size: {batch_size}, dtype: {dtype}"
-    description = f"{sd_model}, compiled {compiled}"
+    description = f"{all_models['sd']}, compiled {compiled}"
 
     print("*******")
     print(label)
@@ -203,7 +210,7 @@ def benchmark_sd_vae(*, device, batch_size, dtype, compiled, vae):
 
 def benchmark_muse_full(*, device, batch_size, dtype, compiled, pipe):
     label = f"full pipeline, batch_size: {batch_size}, dtype: {dtype}"
-    description = f"{muse_model}, compiled {compiled}"
+    description = f"{all_models['muse_f16']}, compiled {compiled}"
 
     print("*******")
     print(label)
@@ -228,7 +235,7 @@ def benchmark_muse_full(*, device, batch_size, dtype, compiled, pipe):
 
 def benchmark_sd_full(*, device, batch_size, dtype, compiled, pipe):
     label = f"full pipeline, batch_size: {batch_size}, dtype: {dtype}"
-    description = f"{sd_model}, compiled {compiled}"
+    description = f"{all_models['sd']}, compiled {compiled}"
 
     print("*******")
     print(label)
@@ -265,17 +272,22 @@ backbone_params = {
 }
 
 
-def main_backbone(device, file, batch_size=None, dtype=None, compiled=None):
+def main_backbone(
+    device, file, batch_size=None, dtype=None, compiled=None, models=None
+):
     results = []
 
     text_encoder = CLIPTextModel.from_pretrained(
-        muse_model, subfolder="text_encoder"
+        all_models["muse_f16"], subfolder="text_encoder"
     ).to(device)
-    tokenizer = AutoTokenizer.from_pretrained(muse_model, subfolder="text_encoder")
+    tokenizer = AutoTokenizer.from_pretrained(
+        all_models["muse_f16"], subfolder="text_encoder"
+    )
 
     dtype_ = dtype or backbone_params[device]["dtype"]
     batch_size_ = batch_size or backbone_params[device]["batch_size"]
     compiled_ = compiled or backbone_params[device]["compiled"]
+    models_ = models or all_models.keys()
 
     for dtype in dtype_:
         for batch_size in batch_size_:
@@ -393,7 +405,9 @@ full_params = {
 def main_full(device, file, batch_size=None, dtype=None, compiled=None):
     results = []
 
-    tokenizer = CLIPTokenizer.from_pretrained(muse_model, subfolder="text_encoder")
+    tokenizer = CLIPTokenizer.from_pretrained(
+        all_models["muse_f16"], subfolder="text_encoder"
+    )
 
     dtype_ = dtype or full_params[device]["dtype"]
     batch_size_ = batch_size or full_params[device]["batch_size"]
@@ -401,7 +415,7 @@ def main_full(device, file, batch_size=None, dtype=None, compiled=None):
 
     for dtype in dtype_:
         text_encoder = CLIPTextModel.from_pretrained(
-            muse_model, subfolder="text_encoder"
+            all_models["muse_f16"], subfolder="text_encoder"
         ).to(device=device, dtype=dtype)
 
         for batch_size in batch_size_:
@@ -438,7 +452,7 @@ def main_full(device, file, batch_size=None, dtype=None, compiled=None):
                 sd_unet = make_sd_unet(device=device, compiled=compiled, dtype=dtype)
 
                 pipe = StableDiffusionPipeline.from_pretrained(
-                    sd_model,
+                    all_models["sd"],
                     vae=sd_vae,
                     unet=sd_unet,
                     text_encoder=text_encoder,
