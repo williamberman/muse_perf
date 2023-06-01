@@ -4,7 +4,7 @@ from muse import PipelineMuse
 
 from transformers import CLIPTextModel, AutoTokenizer
 
-from diffusers import UNet2DConditionModel, AutoencoderKL
+from diffusers import UNet2DConditionModel, AutoencoderKL, StableDiffusionPipeline
 
 import torch
 from torch.utils.benchmark import Timer, Compare
@@ -84,10 +84,10 @@ def make_sd_vae(*, device, compiled, dtype):
 
 
 def benchmark_transformer_backbone(
-    *, device, dtype, compiled, batch_size, transformer, encoder_hidden_states, model
+    *, device, dtype, compiled, batch_size, transformer, encoder_hidden_states
 ):
     label = f"single pass backbone, batch_size: {batch_size}, dtype: {dtype}"
-    description = f"{model}, compiled {compiled}"
+    description = f"{muse_model}, compiled {compiled}"
 
     print("*******")
     print(label)
@@ -115,10 +115,10 @@ def benchmark_transformer_backbone(
 
 
 def benchmark_unet_backbone(
-    *, device, dtype, compiled, batch_size, unet, encoder_hidden_states, model
+    *, device, dtype, compiled, batch_size, unet, encoder_hidden_states
 ):
     label = f"single pass backbone, batch_size: {batch_size}, dtype: {dtype}"
-    description = f"{model}, compiled {compiled}"
+    description = f"{sd_model}, compiled {compiled}"
 
     print("*******")
     print(label)
@@ -145,9 +145,9 @@ def benchmark_unet_backbone(
     return out
 
 
-def benchmark_muse_vae(*, device, batch_size, dtype, compiled, vae, model):
+def benchmark_muse_vae(*, device, batch_size, dtype, compiled, vae):
     label = f"single pass vae, batch_size: {batch_size}, dtype: {dtype}"
-    description = f"{model}, compiled {compiled}"
+    description = f"{muse_model}, compiled {compiled}"
 
     print("*******")
     print(label)
@@ -174,9 +174,9 @@ def benchmark_muse_vae(*, device, batch_size, dtype, compiled, vae, model):
     return out
 
 
-def benchmark_sd_vae(*, device, batch_size, dtype, compiled, vae, model):
+def benchmark_sd_vae(*, device, batch_size, dtype, compiled, vae):
     label = f"single pass vae, batch_size: {batch_size}, dtype: {dtype}"
-    description = f"{model}, compiled {compiled}"
+    description = f"{sd_model}, compiled {compiled}"
 
     print("*******")
     print(label)
@@ -201,9 +201,9 @@ def benchmark_sd_vae(*, device, batch_size, dtype, compiled, vae, model):
     return out
 
 
-def benchmark_full(*, device, batch_size, dtype, compiled, pipe):
-    label = f"{muse_model}, full pipeline, batch_size: {batch_size}, dtype: {dtype}"
-    description = f"compiled {compiled}"
+def benchmark_muse_full(*, device, batch_size, dtype, compiled, pipe):
+    label = f"full pipeline, batch_size: {batch_size}, dtype: {dtype}"
+    description = f"{muse_model}, compiled {compiled}"
 
     print("*******")
     print(label)
@@ -211,6 +211,31 @@ def benchmark_full(*, device, batch_size, dtype, compiled, pipe):
 
     def benchmark_fn():
         pipe(prompt, num_images_per_prompt=batch_size, timesteps=12)
+
+    if compiled:
+        benchmark_fn()
+
+    out = Timer(
+        stmt="benchmark_fn()",
+        globals={"benchmark_fn": benchmark_fn},
+        num_threads=num_threads,
+        label=label,
+        description=description,
+    ).blocked_autorange(min_run_time=1)
+
+    return out
+
+
+def benchmark_sd_full(*, device, batch_size, dtype, compiled, pipe):
+    label = f"full pipeline, batch_size: {batch_size}, dtype: {dtype}"
+    description = f"{sd_model}, compiled {compiled}"
+
+    print("*******")
+    print(label)
+    print(description)
+
+    def benchmark_fn():
+        pipe(prompt, num_images_per_prompt=batch_size, timesteps=20)
 
     if compiled:
         benchmark_fn()
@@ -270,7 +295,6 @@ def main_backbone(device, file):
                     batch_size=batch_size,
                     transformer=muse_transformer,
                     encoder_hidden_states=encoder_hidden_states,
-                    model=muse_model,
                 )
 
                 results.append(bm)
@@ -284,7 +308,6 @@ def main_backbone(device, file):
                     batch_size=batch_size,
                     unet=sd_unet,
                     encoder_hidden_states=encoder_hidden_states,
-                    model=sd_model,
                 )
 
                 results.append(bm)
@@ -323,7 +346,6 @@ def main_vae(device, file):
                     compiled=compiled,
                     batch_size=batch_size,
                     vae=muse_vae,
-                    model=muse_model,
                 )
 
                 results.append(bm)
@@ -336,7 +358,6 @@ def main_vae(device, file):
                     compiled=compiled,
                     batch_size=batch_size,
                     vae=sd_vae,
-                    model=sd_model,
                 )
 
                 results.append(bm)
@@ -373,7 +394,7 @@ def main_full(device, file):
 
         for batch_size in vae_params[device]["batch_size"]:
             for compiled in vae_params[device]["compiled"]:
-                vae = make_muse_vae(device=device, compiled=compiled, dtype=dtype)
+                muse_vae = make_muse_vae(device=device, compiled=compiled, dtype=dtype)
                 muse_transformer = make_muse_transformer(
                     device=device, compiled=compiled, dtype=dtype
                 )
@@ -381,13 +402,35 @@ def main_full(device, file):
                 pipe = PipelineMuse(
                     tokenizer=tokenizer,
                     text_encoder=text_encoder,
-                    vae=vae,
+                    vae=muse_vae,
                     transformer=muse_transformer,
                 )
                 pipe.device = device
                 pipe.dtype = dtype
 
-                bm = benchmark_full(
+                bm = benchmark_muse_full(
+                    device=device,
+                    dtype=dtype,
+                    compiled=compiled,
+                    batch_size=batch_size,
+                    pipe=pipe,
+                )
+
+                results.append(bm)
+
+                sd_vae = make_sd_vae(device=device, compiled=compiled, dtype=dtype)
+                sd_unet = make_sd_unet(device=device, compiled=compiled, dtype=dtype)
+
+                pipe = StableDiffusionPipeline.from_pretrained(
+                    sd_model,
+                    vae=sd_vae,
+                    unet=sd_unet,
+                    text_encoder=text_encoder,
+                    tokenizer=tokenizer,
+                    safety_checker=None,
+                )
+
+                bm = benchmark_sd_full(
                     device=device,
                     dtype=dtype,
                     compiled=compiled,
