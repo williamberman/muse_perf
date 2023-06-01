@@ -4,7 +4,7 @@ from muse import PipelineMuse
 
 from transformers import CLIPTextModel, AutoTokenizer
 
-from diffusers import UNet2DConditionModel
+from diffusers import UNet2DConditionModel, AutoencoderKL
 
 import torch
 from torch.utils.benchmark import Timer, Compare
@@ -61,8 +61,19 @@ def make_sd_unet(*, device, compiled, dtype):
     return unet
 
 
-def make_vae(*, device, compiled, dtype):
+def make_muse_vae(*, device, compiled, dtype):
     vae = VQGANModel.from_pretrained(muse_model, subfolder="vae")
+
+    vae = vae.to(device=device, dtype=dtype)
+
+    if compiled:
+        vae = torch.compile(vae)
+
+    return vae
+
+
+def make_sd_vae(*, device, compiled, dtype):
+    vae = AutoencoderKL.from_pretrained(sd_model, subfolder="vae")
 
     vae = vae.to(device=device, dtype=dtype)
 
@@ -102,6 +113,7 @@ def benchmark_transformer_backbone(
 
     return out
 
+
 def benchmark_unet_backbone(
     *, device, dtype, compiled, batch_size, unet, encoder_hidden_states, model
 ):
@@ -133,9 +145,9 @@ def benchmark_unet_backbone(
     return out
 
 
-def benchmark_vae(*, device, batch_size, dtype, compiled, vae):
-    label = f"{muse_model}, single pass vae, batch_size: {batch_size}, dtype: {dtype}"
-    description = f"compiled {compiled}"
+def benchmark_muse_vae(*, device, batch_size, dtype, compiled, vae, model):
+    label = f"single pass vae, batch_size: {batch_size}, dtype: {dtype}"
+    description = f"{model}, compiled {compiled}"
 
     print("*******")
     print(label)
@@ -147,6 +159,33 @@ def benchmark_vae(*, device, batch_size, dtype, compiled, vae):
 
     def benchmark_fn():
         vae.decode_code(image_tokens)
+
+    if compiled:
+        benchmark_fn()
+
+    out = Timer(
+        stmt="benchmark_fn()",
+        globals={"benchmark_fn": benchmark_fn},
+        num_threads=num_threads,
+        label=label,
+        description=description,
+    ).blocked_autorange(min_run_time=1)
+
+    return out
+
+
+def benchmark_sd_vae(*, device, batch_size, dtype, compiled, vae, model):
+    label = f"single pass vae, batch_size: {batch_size}, dtype: {dtype}"
+    description = f"{model}, compiled {compiled}"
+
+    print("*******")
+    print(label)
+    print(description)
+
+    latent_image = torch.randn((batch_size, 4, 64, 64), dtype=dtype, device=device)
+
+    def benchmark_fn():
+        vae.decode(latent_image)
 
     if compiled:
         benchmark_fn()
@@ -276,14 +315,28 @@ def main_vae(device, file):
     for dtype in vae_params[device]["dtype"]:
         for batch_size in vae_params[device]["batch_size"]:
             for compiled in vae_params[device]["compiled"]:
-                vae = make_vae(device=device, compiled=compiled, dtype=dtype)
+                muse_vae = make_muse_vae(device=device, compiled=compiled, dtype=dtype)
 
-                bm = benchmark_vae(
+                bm = benchmark_muse_vae(
                     device=device,
                     dtype=dtype,
                     compiled=compiled,
                     batch_size=batch_size,
-                    vae=vae,
+                    vae=muse_vae,
+                    model=muse_model,
+                )
+
+                results.append(bm)
+
+                sd_vae = make_sd_vae(device=device, compiled=compiled, dtype=dtype)
+
+                bm = benchmark_sd_vae(
+                    device=device,
+                    dtype=dtype,
+                    compiled=compiled,
+                    batch_size=batch_size,
+                    vae=sd_vae,
+                    model=sd_model,
                 )
 
                 results.append(bm)
@@ -320,7 +373,7 @@ def main_full(device, file):
 
         for batch_size in vae_params[device]["batch_size"]:
             for compiled in vae_params[device]["compiled"]:
-                vae = make_vae(device=device, compiled=compiled, dtype=dtype)
+                vae = make_muse_vae(device=device, compiled=compiled, dtype=dtype)
                 muse_transformer = make_muse_transformer(
                     device=device, compiled=compiled, dtype=dtype
                 )
