@@ -1,0 +1,36 @@
+[------------------------------------------------------------------------- single pass backbone, batch_size: 1, dtype: torch.float16 --------------------------------------------------------------------------]
+                      |  williamberman/laiona6plus_uvit_clip_f8, compiled None  |  williamberman/laiona6plus_uvit_clip_f8, compiled default  |  williamberman/laiona6plus_uvit_clip_f8, compiled reduce-overhead
+6 threads: -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      benchmark_fn()  |                           25.8                          |                            18.8                            |                                4.0                               
+
+Times are in milliseconds (ms).
+[------------------------------------------------------------------------- single pass backbone, batch_size: 2, dtype: torch.float16 --------------------------------------------------------------------------]
+                      |  williamberman/laiona6plus_uvit_clip_f8, compiled None  |  williamberman/laiona6plus_uvit_clip_f8, compiled default  |  williamberman/laiona6plus_uvit_clip_f8, compiled reduce-overhead
+6 threads: -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      benchmark_fn()  |                           25.9                          |                            18.7                            |                                4.3                               
+
+Times are in milliseconds (ms).
+[------------------------------------------------------------------------- single pass backbone, batch_size: 4, dtype: torch.float16 --------------------------------------------------------------------------]
+                      |  williamberman/laiona6plus_uvit_clip_f8, compiled None  |  williamberman/laiona6plus_uvit_clip_f8, compiled default  |  williamberman/laiona6plus_uvit_clip_f8, compiled reduce-overhead
+6 threads: -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      benchmark_fn()  |                           25.9                          |                            18.6                            |                                5.0                               
+
+Times are in milliseconds (ms).
+[------------------------------------------------------------------------- single pass backbone, batch_size: 8, dtype: torch.float16 --------------------------------------------------------------------------]
+                      |  williamberman/laiona6plus_uvit_clip_f8, compiled None  |  williamberman/laiona6plus_uvit_clip_f8, compiled default  |  williamberman/laiona6plus_uvit_clip_f8, compiled reduce-overhead
+6 threads: -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      benchmark_fn()  |                           26.7                          |                            19.4                            |                                6.8                               
+
+Times are in milliseconds (ms).
+[------------------------------------------------------------------------- single pass backbone, batch_size: 16, dtype: torch.float16 -------------------------------------------------------------------------]
+                      |  williamberman/laiona6plus_uvit_clip_f8, compiled None  |  williamberman/laiona6plus_uvit_clip_f8, compiled default  |  williamberman/laiona6plus_uvit_clip_f8, compiled reduce-overhead
+6 threads: -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      benchmark_fn()  |                           27.0                          |                            19.3                            |                                11.1                              
+
+Times are in milliseconds (ms).
+[------------------------------------------------------------------------- single pass backbone, batch_size: 32, dtype: torch.float16 -------------------------------------------------------------------------]
+                      |  williamberman/laiona6plus_uvit_clip_f8, compiled None  |  williamberman/laiona6plus_uvit_clip_f8, compiled default  |  williamberman/laiona6plus_uvit_clip_f8, compiled reduce-overhead
+6 threads: -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      benchmark_fn()  |                           28.7                          |                            20.8                            |                                17.8                              
+
+Times are in milliseconds (ms).
