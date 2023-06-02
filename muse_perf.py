@@ -355,7 +355,7 @@ def main_vae(device, dtype=None, batch_size=None, compiled=None, model=None):
         for batch_size in batch_size_:
             for compiled in compiled_:
                 for model in model_:
-                    if model_ == "muse_f16":
+                    if model == "muse_f16":
                         muse_vae = make_muse_vae(
                             device=device, compiled=compiled, dtype=dtype
                         )
