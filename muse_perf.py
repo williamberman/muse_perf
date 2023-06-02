@@ -20,8 +20,7 @@ prompt = "A high tech solarpunk utopia in the Amazon rainforest"
 all_models = {
     "muse_f16": "openMUSE/muse-laiona6-uvit-clip-220k",
     "sd": "runwayml/stable-diffusion-v1-5",
-    # TODO
-    # "muse_f8": "laiona6plus_uvit_clip_f8"
+    "muse_f8": "williamberman/laiona6plus_uvit_clip_f8",
 }
 
 
@@ -44,10 +43,8 @@ def make_encoder_hidden_states(*, device, dtype, batch_size, tokenizer, text_enc
     return encoder_hidden_states
 
 
-def make_muse_transformer(*, device, compiled, dtype):
-    transformer = MaskGiTUViT.from_pretrained(
-        all_models["muse_f16"], subfolder="transformer"
-    )
+def make_muse_transformer(*, device, compiled, dtype, model):
+    transformer = MaskGiTUViT.from_pretrained(model, subfolder="transformer")
 
     transformer = transformer.to(device=device, dtype=dtype)
 
@@ -68,8 +65,13 @@ def make_sd_unet(*, device, compiled, dtype):
     return unet
 
 
-def make_muse_vae(*, device, compiled, dtype):
-    vae = VQGANModel.from_pretrained(all_models["muse_f16"], subfolder="vae")
+def make_muse_vae(*, device, compiled, dtype, model):
+    if model == all_models["muse_f16"]:
+        vae = VQGANModel.from_pretrained(model, subfolder="vae")
+    elif model == all_models["muse_f8"]:
+        vae = PaellaVQModel.from_pretrained(model, subfolder="vae")
+    else:
+        assert False, model
 
     vae = vae.to(device=device, dtype=dtype)
 
@@ -91,10 +93,10 @@ def make_sd_vae(*, device, compiled, dtype):
 
 
 def benchmark_transformer_backbone(
-    *, device, dtype, compiled, batch_size, transformer, encoder_hidden_states
+    *, device, dtype, compiled, batch_size, transformer, encoder_hidden_states, model
 ):
     label = f"single pass backbone, batch_size: {batch_size}, dtype: {dtype}"
-    description = f"{all_models['muse_f16']}, compiled {compiled}"
+    description = f"{model}, compiled {compiled}"
 
     print("*******")
     print(label)
@@ -269,13 +271,6 @@ backbone_params = {
 def main_backbone(device, batch_size=None, dtype=None, compiled=None, model=None):
     results = []
 
-    text_encoder = CLIPTextModel.from_pretrained(
-        all_models["muse_f16"], subfolder="text_encoder"
-    ).to(device)
-    tokenizer = AutoTokenizer.from_pretrained(
-        all_models["muse_f16"], subfolder="text_encoder"
-    )
-
     dtype_ = dtype or backbone_params[device]["dtype"]
     batch_size_ = batch_size or backbone_params[device]["batch_size"]
     compiled_ = compiled or backbone_params[device]["compiled"]
@@ -283,19 +278,30 @@ def main_backbone(device, batch_size=None, dtype=None, compiled=None, model=None
 
     for dtype in dtype_:
         for batch_size in batch_size_:
-            encoder_hidden_states = make_encoder_hidden_states(
-                device=device,
-                dtype=dtype,
-                batch_size=batch_size,
-                tokenizer=tokenizer,
-                text_encoder=text_encoder,
-            )
-
             for compiled in compiled_:
                 for model in model_:
-                    if model == "muse_f16":
+                    if model in ["muse_f16", "muse_f8"]:
+                        text_encoder = CLIPTextModel.from_pretrained(
+                            all_models[model], subfolder="text_encoder"
+                        ).to(device)
+
+                        tokenizer = AutoTokenizer.from_pretrained(
+                            all_models[model], subfolder="text_encoder"
+                        )
+
+                        encoder_hidden_states = make_encoder_hidden_states(
+                            device=device,
+                            dtype=dtype,
+                            batch_size=batch_size,
+                            tokenizer=tokenizer,
+                            text_encoder=text_encoder,
+                        )
+
                         muse_transformer = make_muse_transformer(
-                            device=device, compiled=compiled, dtype=dtype
+                            device=device,
+                            compiled=compiled,
+                            dtype=dtype,
+                            model=all_models[model],
                         )
 
                         bm = benchmark_transformer_backbone(
@@ -305,10 +311,27 @@ def main_backbone(device, batch_size=None, dtype=None, compiled=None, model=None
                             batch_size=batch_size,
                             transformer=muse_transformer,
                             encoder_hidden_states=encoder_hidden_states,
+                            model=all_models[model],
                         )
 
                         results.append(bm)
                     elif model == "sd":
+                        text_encoder = CLIPTextModel.from_pretrained(
+                            all_models[model], subfolder="text_encoder"
+                        ).to(device)
+
+                        tokenizer = AutoTokenizer.from_pretrained(
+                            all_models[model], subfolder="text_encoder"
+                        )
+
+                        encoder_hidden_states = make_encoder_hidden_states(
+                            device=device,
+                            dtype=dtype,
+                            batch_size=batch_size,
+                            tokenizer=tokenizer,
+                            text_encoder=text_encoder,
+                        )
+
                         sd_unet = make_sd_unet(
                             device=device, compiled=compiled, dtype=dtype
                         )
@@ -355,9 +378,12 @@ def main_vae(device, dtype=None, batch_size=None, compiled=None, model=None):
         for batch_size in batch_size_:
             for compiled in compiled_:
                 for model in model_:
-                    if model == "muse_f16":
+                    if model in ["muse_f16", "muse_f8"]:
                         muse_vae = make_muse_vae(
-                            device=device, compiled=compiled, dtype=dtype
+                            device=device,
+                            compiled=compiled,
+                            dtype=dtype,
+                            model=all_models[model],
                         )
 
                         bm = benchmark_muse_vae(
@@ -406,29 +432,35 @@ full_params = {
 def main_full(device, batch_size=None, dtype=None, compiled=None, model=None):
     results = []
 
-    tokenizer = CLIPTokenizer.from_pretrained(
-        all_models["muse_f16"], subfolder="text_encoder"
-    )
-
     dtype_ = dtype or full_params[device]["dtype"]
     batch_size_ = batch_size or full_params[device]["batch_size"]
     compiled_ = compiled or full_params[device]["compiled"]
     model_ = model or all_models.keys()
 
     for dtype in dtype_:
-        text_encoder = CLIPTextModel.from_pretrained(
-            all_models["muse_f16"], subfolder="text_encoder"
-        ).to(device=device, dtype=dtype)
-
         for batch_size in batch_size_:
             for compiled in compiled_:
                 for model in model_:
-                    if model == "muse_f16":
+                    if model in ["muse_f16", "muse_f8"]:
+                        tokenizer = CLIPTokenizer.from_pretrained(
+                            all_models[model], subfolder="text_encoder"
+                        )
+
+                        text_encoder = CLIPTextModel.from_pretrained(
+                            all_models[model], subfolder="text_encoder"
+                        ).to(device=device, dtype=dtype)
+
                         muse_vae = make_muse_vae(
-                            device=device, compiled=compiled, dtype=dtype
+                            device=device,
+                            compiled=compiled,
+                            dtype=dtype,
+                            model=all_models[model],
                         )
                         muse_transformer = make_muse_transformer(
-                            device=device, compiled=compiled, dtype=dtype
+                            device=device,
+                            compiled=compiled,
+                            dtype=dtype,
+                            model=all_models[model],
                         )
 
                         pipe = PipelineMuse(
@@ -453,6 +485,14 @@ def main_full(device, batch_size=None, dtype=None, compiled=None, model=None):
                         # skip for stable diffusion
                         if batch_size > 1 and device == "cpu":
                             continue
+
+                        tokenizer = CLIPTokenizer.from_pretrained(
+                            all_models[model], subfolder="text_encoder"
+                        )
+
+                        text_encoder = CLIPTextModel.from_pretrained(
+                            all_models[model], subfolder="text_encoder"
+                        ).to(device=device, dtype=dtype)
 
                         sd_vae = make_sd_vae(
                             device=device, compiled=compiled, dtype=dtype
