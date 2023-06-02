@@ -266,9 +266,7 @@ backbone_params = {
 }
 
 
-def main_backbone(
-    device, file, batch_size=None, dtype=None, compiled=None, models=None
-):
+def main_backbone(device, batch_size=None, dtype=None, compiled=None, model=None):
     results = []
 
     text_encoder = CLIPTextModel.from_pretrained(
@@ -281,7 +279,7 @@ def main_backbone(
     dtype_ = dtype or backbone_params[device]["dtype"]
     batch_size_ = batch_size or backbone_params[device]["batch_size"]
     compiled_ = compiled or backbone_params[device]["compiled"]
-    models_ = models or all_models.keys()
+    model_ = model or all_models.keys()
 
     for dtype in dtype_:
         for batch_size in batch_size_:
@@ -294,38 +292,41 @@ def main_backbone(
             )
 
             for compiled in compiled_:
-                muse_transformer = make_muse_transformer(
-                    device=device, compiled=compiled, dtype=dtype
-                )
+                for model in model_:
+                    if model == "muse_f16":
+                        muse_transformer = make_muse_transformer(
+                            device=device, compiled=compiled, dtype=dtype
+                        )
 
-                bm = benchmark_transformer_backbone(
-                    device=device,
-                    dtype=dtype,
-                    compiled=compiled,
-                    batch_size=batch_size,
-                    transformer=muse_transformer,
-                    encoder_hidden_states=encoder_hidden_states,
-                )
+                        bm = benchmark_transformer_backbone(
+                            device=device,
+                            dtype=dtype,
+                            compiled=compiled,
+                            batch_size=batch_size,
+                            transformer=muse_transformer,
+                            encoder_hidden_states=encoder_hidden_states,
+                        )
 
-                results.append(bm)
+                        results.append(bm)
+                    elif model == "sd":
+                        sd_unet = make_sd_unet(
+                            device=device, compiled=compiled, dtype=dtype
+                        )
 
-                sd_unet = make_sd_unet(device=device, compiled=compiled, dtype=dtype)
+                        bm = benchmark_unet_backbone(
+                            device=device,
+                            dtype=dtype,
+                            compiled=compiled,
+                            batch_size=batch_size,
+                            unet=sd_unet,
+                            encoder_hidden_states=encoder_hidden_states,
+                        )
 
-                bm = benchmark_unet_backbone(
-                    device=device,
-                    dtype=dtype,
-                    compiled=compiled,
-                    batch_size=batch_size,
-                    unet=sd_unet,
-                    encoder_hidden_states=encoder_hidden_states,
-                )
+                        results.append(bm)
+                    else:
+                        assert False, model
 
-                results.append(bm)
-
-    out = str(Compare(results))
-
-    with open(file, "a") as f:
-        f.write(out)
+    return results
 
 
 vae_params = {
@@ -342,44 +343,50 @@ vae_params = {
 }
 
 
-def main_vae(device, file, dtype=None, batch_size=None, compiled=None):
+def main_vae(device, dtype=None, batch_size=None, compiled=None, model=None):
     results = []
 
     dtype_ = dtype or vae_params[device]["dtype"]
     batch_size_ = batch_size or vae_params[device]["batch_size"]
     compiled_ = compiled or vae_params[device]["compiled"]
+    model_ = model or all_models.keys()
 
     for dtype in dtype_:
         for batch_size in batch_size_:
             for compiled in compiled_:
-                muse_vae = make_muse_vae(device=device, compiled=compiled, dtype=dtype)
+                for model in model_:
+                    if model_ == "muse_f16":
+                        muse_vae = make_muse_vae(
+                            device=device, compiled=compiled, dtype=dtype
+                        )
 
-                bm = benchmark_muse_vae(
-                    device=device,
-                    dtype=dtype,
-                    compiled=compiled,
-                    batch_size=batch_size,
-                    vae=muse_vae,
-                )
+                        bm = benchmark_muse_vae(
+                            device=device,
+                            dtype=dtype,
+                            compiled=compiled,
+                            batch_size=batch_size,
+                            vae=muse_vae,
+                        )
 
-                results.append(bm)
+                        results.append(bm)
+                    elif model == "sd":
+                        sd_vae = make_sd_vae(
+                            device=device, compiled=compiled, dtype=dtype
+                        )
 
-                sd_vae = make_sd_vae(device=device, compiled=compiled, dtype=dtype)
+                        bm = benchmark_sd_vae(
+                            device=device,
+                            dtype=dtype,
+                            compiled=compiled,
+                            batch_size=batch_size,
+                            vae=sd_vae,
+                        )
 
-                bm = benchmark_sd_vae(
-                    device=device,
-                    dtype=dtype,
-                    compiled=compiled,
-                    batch_size=batch_size,
-                    vae=sd_vae,
-                )
+                        results.append(bm)
+                    else:
+                        assert False, model
 
-                results.append(bm)
-
-    out = str(Compare(results))
-
-    with open(file, "a") as f:
-        f.write(out)
+    return results
 
 
 full_params = {
@@ -396,7 +403,7 @@ full_params = {
 }
 
 
-def main_full(device, file, batch_size=None, dtype=None, compiled=None):
+def main_full(device, batch_size=None, dtype=None, compiled=None, model=None):
     results = []
 
     tokenizer = CLIPTokenizer.from_pretrained(
@@ -406,6 +413,7 @@ def main_full(device, file, batch_size=None, dtype=None, compiled=None):
     dtype_ = dtype or full_params[device]["dtype"]
     batch_size_ = batch_size or full_params[device]["batch_size"]
     compiled_ = compiled or full_params[device]["compiled"]
+    model_ = model or all_models.keys()
 
     for dtype in dtype_:
         text_encoder = CLIPTextModel.from_pretrained(
@@ -414,60 +422,72 @@ def main_full(device, file, batch_size=None, dtype=None, compiled=None):
 
         for batch_size in batch_size_:
             for compiled in compiled_:
-                muse_vae = make_muse_vae(device=device, compiled=compiled, dtype=dtype)
-                muse_transformer = make_muse_transformer(
-                    device=device, compiled=compiled, dtype=dtype
-                )
+                for model in model_:
+                    if model == "muse_f16":
+                        muse_vae = make_muse_vae(
+                            device=device, compiled=compiled, dtype=dtype
+                        )
+                        muse_transformer = make_muse_transformer(
+                            device=device, compiled=compiled, dtype=dtype
+                        )
 
-                pipe = PipelineMuse(
-                    tokenizer=tokenizer,
-                    text_encoder=text_encoder,
-                    vae=muse_vae,
-                    transformer=muse_transformer,
-                )
-                pipe.device = device
-                pipe.dtype = dtype
+                        pipe = PipelineMuse(
+                            tokenizer=tokenizer,
+                            text_encoder=text_encoder,
+                            vae=muse_vae,
+                            transformer=muse_transformer,
+                        )
+                        pipe.device = device
+                        pipe.dtype = dtype
 
-                bm = benchmark_muse_full(
-                    device=device,
-                    dtype=dtype,
-                    compiled=compiled,
-                    batch_size=batch_size,
-                    pipe=pipe,
-                )
+                        bm = benchmark_muse_full(
+                            device=device,
+                            dtype=dtype,
+                            compiled=compiled,
+                            batch_size=batch_size,
+                            pipe=pipe,
+                        )
 
-                results.append(bm)
+                        results.append(bm)
+                    elif model == "sd":
+                        # skip for stable diffusion
+                        if batch_size > 1 and device == "cpu":
+                            continue
 
-                # skip for stable diffusion
-                if batch_size > 1 and device == "cpu":
-                    continue
+                        sd_vae = make_sd_vae(
+                            device=device, compiled=compiled, dtype=dtype
+                        )
+                        sd_unet = make_sd_unet(
+                            device=device, compiled=compiled, dtype=dtype
+                        )
 
-                sd_vae = make_sd_vae(device=device, compiled=compiled, dtype=dtype)
-                sd_unet = make_sd_unet(device=device, compiled=compiled, dtype=dtype)
+                        pipe = StableDiffusionPipeline.from_pretrained(
+                            all_models["sd"],
+                            vae=sd_vae,
+                            unet=sd_unet,
+                            text_encoder=text_encoder,
+                            tokenizer=tokenizer,
+                            safety_checker=None,
+                        )
 
-                pipe = StableDiffusionPipeline.from_pretrained(
-                    all_models["sd"],
-                    vae=sd_vae,
-                    unet=sd_unet,
-                    text_encoder=text_encoder,
-                    tokenizer=tokenizer,
-                    safety_checker=None,
-                )
+                        # diffusers strips the compilation from the module
+                        if compiled is not None:
+                            pipe.vae = torch.compile(pipe.vae, mode=compiled)
+                            pipe.unet = torch.compile(pipe.unet, mode=compiled)
 
-                bm = benchmark_sd_full(
-                    device=device,
-                    dtype=dtype,
-                    compiled=compiled,
-                    batch_size=batch_size,
-                    pipe=pipe,
-                )
+                        bm = benchmark_sd_full(
+                            device=device,
+                            dtype=dtype,
+                            compiled=compiled,
+                            batch_size=batch_size,
+                            pipe=pipe,
+                        )
 
-                results.append(bm)
+                        results.append(bm)
+                    else:
+                        assert False, model
 
-    out = str(Compare(results))
-
-    with open(file, "a") as f:
-        f.write(out)
+    return results
 
 
 def compiled_parser(string):
@@ -479,53 +499,63 @@ def compiled_parser(string):
         assert False, f"{string} can't parse as compiled option"
 
 
-parser = ArgumentParser()
-parser.add_argument("--model", required=False)
-parser.add_argument("--full", required=False, action="store_true")
-parser.add_argument("--device", required=True)
-parser.add_argument("--file", required=True)
-parser.add_argument("--batch_size", required=False, nargs="+", type=int)
-parser.add_argument("--dtype", required=False, nargs="+")
-parser.add_argument("--compiled", required=False, nargs="+", type=compiled_parser)
+if __name__ == "__main__":
+    parser = ArgumentParser()
+    parser.add_argument("--component", required=False)
+    parser.add_argument("--full", required=False, action="store_true")
+    parser.add_argument("--device", required=True)
+    parser.add_argument("--file", required=False)
+    parser.add_argument("--batch_size", required=False, nargs="+", type=int)
+    parser.add_argument("--dtype", required=False, nargs="+")
+    parser.add_argument("--compiled", required=False, nargs="+", type=compiled_parser)
+    parser.add_argument("--model", required=False, nargs="+")
 
-args = parser.parse_args()
+    args = parser.parse_args()
 
-if args.dtype is not None:
-    dtypes = []
-    for dtype in args.dtype:
-        if dtype == "float32":
-            dtypes.append(torch.float32)
-        elif dtype == "float16":
-            dtypes.append(torch.float16)
-        else:
-            assert False
-else:
-    dtypes = None
+    if args.dtype is not None:
+        dtypes = []
+        for dtype in args.dtype:
+            if dtype == "float32":
+                dtypes.append(torch.float32)
+            elif dtype == "float16":
+                dtypes.append(torch.float16)
+            else:
+                assert False
+    else:
+        dtypes = None
 
-if args.full:
-    main_full(
-        args.device,
-        args.file,
-        batch_size=args.batch_size,
-        dtype=dtypes,
-        compiled=args.compiled,
-    )
-else:
-    if args.model == "backbone":
-        main_backbone(
+    if args.full:
+        results = main_full(
             args.device,
-            args.file,
             batch_size=args.batch_size,
             dtype=dtypes,
             compiled=args.compiled,
-        )
-    elif args.model == "vae":
-        main_vae(
-            args.device,
-            args.file,
-            batch_size=args.batch_size,
-            dtype=dtypes,
-            compiled=args.compiled,
+            model=args.model,
         )
     else:
-        assert False
+        if args.component == "backbone":
+            results = main_backbone(
+                args.device,
+                batch_size=args.batch_size,
+                dtype=dtypes,
+                compiled=args.compiled,
+                model=args.model,
+            )
+        elif args.component == "vae":
+            results = main_vae(
+                args.device,
+                batch_size=args.batch_size,
+                dtype=dtypes,
+                compiled=args.compiled,
+                model=args.model,
+            )
+        else:
+            assert False, args.component
+
+    results = str(Compare(results))
+
+    if args.file is not None:
+        with open(args.file, "a") as f:
+            f.write(results)
+    else:
+        print(results)
