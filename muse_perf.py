@@ -1,6 +1,6 @@
 from muse.modeling_taming_vqgan import VQGANModel
 from muse.modeling_transformer import MaskGiTUViT
-from muse import PipelineMuse
+from muse import PipelineMuse, PaellaVQModel
 
 from transformers import CLIPTextModel, AutoTokenizer, CLIPTokenizer
 
