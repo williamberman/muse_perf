@@ -152,9 +152,9 @@ def benchmark_unet_backbone(
     return out
 
 
-def benchmark_muse_vae(*, device, batch_size, dtype, compiled, vae):
+def benchmark_muse_vae(*, device, batch_size, dtype, compiled, vae, model):
     label = f"single pass vae, batch_size: {batch_size}, dtype: {dtype}"
-    description = f"{all_models['muse_f16']}, compiled {compiled}"
+    description = f"{model}, compiled {compiled}"
 
     print("*******")
     print(label)
@@ -206,9 +206,9 @@ def benchmark_sd_vae(*, device, batch_size, dtype, compiled, vae):
     return out
 
 
-def benchmark_muse_full(*, device, batch_size, dtype, compiled, pipe):
+def benchmark_muse_full(*, device, batch_size, dtype, compiled, pipe, model):
     label = f"full pipeline, batch_size: {batch_size}, dtype: {dtype}"
-    description = f"{all_models['muse_f16']}, compiled {compiled}"
+    description = f"{model}, compiled {compiled}"
 
     print("*******")
     print(label)
@@ -392,6 +392,7 @@ def main_vae(device, dtype=None, batch_size=None, compiled=None, model=None):
                             compiled=compiled,
                             batch_size=batch_size,
                             vae=muse_vae,
+                            model=all_models[model],
                         )
 
                         results.append(bm)
@@ -478,6 +479,7 @@ def main_full(device, batch_size=None, dtype=None, compiled=None, model=None):
                             compiled=compiled,
                             batch_size=batch_size,
                             pipe=pipe,
+                            model=all_models[model],
                         )
 
                         results.append(bm)
