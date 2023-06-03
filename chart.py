@@ -25,12 +25,7 @@ def chart(device, component, compiled, plot_on, legend):
         nonlocal placement
         placement = [x + bar_width for x in placement]
 
-    this_chart_model_names = fdf["Model Name"].unique()
-
     for model_name in model_names:
-        if model_name not in this_chart_model_names:
-            continue
-
         filter_ = fdf["Model Name"] == model_name
 
         ffdf = fdf[filter_]
