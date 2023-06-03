@@ -2,4 +2,4 @@
 
 ![backbone](./backbone.png)
 
-![vae](./backbone.png)
+![vae](./vae.png)
