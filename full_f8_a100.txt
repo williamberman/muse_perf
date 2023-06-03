@@ -1,35 +1,35 @@
 [-------------------------------------------------------------------------- full pipeline, batch_size: 1, dtype: torch.float16 --------------------------------------------------------------------------]
-                      |  openMUSE/muse-laiona6-uvit-clip-220k, compiled None  |  openMUSE/muse-laiona6-uvit-clip-220k, compiled default  |  openMUSE/muse-laiona6-uvit-clip-220k, compiled reduce-overhead
+                      |  williamberman/laiona6plus_uvit_clip_f8, compiled None  |  williamberman/laiona6plus_uvit_clip_f8, compiled default  |  williamberman/laiona6plus_uvit_clip_f8, compiled reduce-overhead
 6 threads: -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
       benchmark_fn()  |                         356.0                         |                          360.6                           |                              359.3                             
 
 Times are in milliseconds (ms).
 [-------------------------------------------------------------------------- full pipeline, batch_size: 2, dtype: torch.float16 --------------------------------------------------------------------------]
-                      |  openMUSE/muse-laiona6-uvit-clip-220k, compiled None  |  openMUSE/muse-laiona6-uvit-clip-220k, compiled default  |  openMUSE/muse-laiona6-uvit-clip-220k, compiled reduce-overhead
+                      |  williamberman/laiona6plus_uvit_clip_f8, compiled None  |  williamberman/laiona6plus_uvit_clip_f8, compiled default  |  williamberman/laiona6plus_uvit_clip_f8, compiled reduce-overhead
 6 threads: -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
       benchmark_fn()  |                         407.5                         |                          419.2                           |                              417.1                             
 
 Times are in milliseconds (ms).
 [-------------------------------------------------------------------------- full pipeline, batch_size: 4, dtype: torch.float16 --------------------------------------------------------------------------]
-                      |  openMUSE/muse-laiona6-uvit-clip-220k, compiled None  |  openMUSE/muse-laiona6-uvit-clip-220k, compiled default  |  openMUSE/muse-laiona6-uvit-clip-220k, compiled reduce-overhead
+                      |  williamberman/laiona6plus_uvit_clip_f8, compiled None  |  williamberman/laiona6plus_uvit_clip_f8, compiled default  |  williamberman/laiona6plus_uvit_clip_f8, compiled reduce-overhead
 6 threads: -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
       benchmark_fn()  |                         492.1                         |                          496.6                           |                              495.0                             
 
 Times are in milliseconds (ms).
 [-------------------------------------------------------------------------- full pipeline, batch_size: 8, dtype: torch.float16 --------------------------------------------------------------------------]
-                      |  openMUSE/muse-laiona6-uvit-clip-220k, compiled None  |  openMUSE/muse-laiona6-uvit-clip-220k, compiled default  |  openMUSE/muse-laiona6-uvit-clip-220k, compiled reduce-overhead
+                      |  williamberman/laiona6plus_uvit_clip_f8, compiled None  |  williamberman/laiona6plus_uvit_clip_f8, compiled default  |  williamberman/laiona6plus_uvit_clip_f8, compiled reduce-overhead
 6 threads: -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
       benchmark_fn()  |                         789.4                         |                          790.0                           |                              790.1                             
 
 Times are in milliseconds (ms).
 [------------------------------------------------------------------------- full pipeline, batch_size: 16, dtype: torch.float16 --------------------------------------------------------------------------]
-                      |  openMUSE/muse-laiona6-uvit-clip-220k, compiled None  |  openMUSE/muse-laiona6-uvit-clip-220k, compiled default  |  openMUSE/muse-laiona6-uvit-clip-220k, compiled reduce-overhead
+                      |  williamberman/laiona6plus_uvit_clip_f8, compiled None  |  williamberman/laiona6plus_uvit_clip_f8, compiled default  |  williamberman/laiona6plus_uvit_clip_f8, compiled reduce-overhead
 6 threads: -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
       benchmark_fn()  |                          1.6                          |                           1.6                            |                               1.6                              
 
 Times are in seconds (s).
 [------------------------------------------------------------------------- full pipeline, batch_size: 32, dtype: torch.float16 --------------------------------------------------------------------------]
-                      |  openMUSE/muse-laiona6-uvit-clip-220k, compiled None  |  openMUSE/muse-laiona6-uvit-clip-220k, compiled default  |  openMUSE/muse-laiona6-uvit-clip-220k, compiled reduce-overhead
+                      |  williamberman/laiona6plus_uvit_clip_f8, compiled None  |  williamberman/laiona6plus_uvit_clip_f8, compiled default  |  williamberman/laiona6plus_uvit_clip_f8, compiled reduce-overhead
 6 threads: -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
       benchmark_fn()  |                          3.0                          |                           3.0                            |                               3.0                              
 
