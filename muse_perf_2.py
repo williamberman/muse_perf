@@ -132,7 +132,13 @@ def main():
         writer.writerows(csv_data)
 
 
-def muse_benchmark_transformer_backbone(
+def muse_benchmark_transformer_backbone(in_queue, out_queue, timeout):
+    wrap_subprocess_fn(
+        in_queue, out_queue, timeout, _muse_benchmark_transformer_backbone
+    )
+
+
+def _muse_benchmark_transformer_backbone(
     device, dtype, compiled, batch_size, model, label, description
 ):
     text_encoder = CLIPTextModel.from_pretrained(model, subfolder="text_encoder").to(
@@ -183,7 +189,11 @@ def muse_benchmark_transformer_backbone(
     return out
 
 
-def sd_benchmark_unet_backbone(
+def sd_benchmark_unet_backbone(in_queue, out_queue, timeout):
+    wrap_subprocess_fn(in_queue, out_queue, timeout, _sd_benchmark_unet_backbone)
+
+
+def _sd_benchmark_unet_backbone(
     device, dtype, compiled, batch_size, model, label, description
 ):
     unet = UNet2DConditionModel.from_pretrained(model, subfolder="unet")
@@ -234,24 +244,20 @@ def sd_benchmark_unet_backbone(
     return out
 
 
-def wrap_subprocess_fn(fn):
-    def wrapped(in_queue, out_queue, timeout):
-        error = None
-        out = None
+def wrap_subprocess_fn(in_queue, out_queue, timeout, fn):
+    error = None
+    out = None
 
-        try:
-            args = in_queue.get(timeout=timeout)
+    try:
+        args = in_queue.get(timeout=timeout)
+        out = fn(*args)
 
-            out = fn(*args)
+    except Exception:
+        error = f"{traceback.format_exc()}"
 
-        except Exception:
-            error = f"{traceback.format_exc()}"
-
-        results = {"error": error, "out": out}
-        out_queue.put(results, timeout=timeout)
-        out_queue.join()
-
-    return wrapped
+    results = {"error": error, "out": out}
+    out_queue.put(results, timeout=timeout)
+    out_queue.join()
 
 
 def run_in_subprocess(target_func, inputs=None):
