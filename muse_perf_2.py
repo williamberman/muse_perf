@@ -62,17 +62,19 @@ params = {
 
 
 def main():
-    params = ArgumentParser()
-    params.add_argument("--device", required=True)
+    args = ArgumentParser()
+    args.add_argument("--device", required=True)
 
-    args = params.parse()
+    args = args.parse_args()
 
     assert args.device in params
 
     if args.device in ["4090", "a100", "t4"]:
         dtype = torch.float16
+        torch_device = "cuda"
     elif args.device in ["cpu"]:
         dtype = torch.float32
+        torch_device = "cpu"
     else:
         assert False
 
@@ -84,11 +86,15 @@ def main():
                 batch_size
             ]:
                 out = muse_benchmark_transformer_backbone(
-                    args.device, dtype, compiled, batch_size, model
+                    torch_device, dtype, compiled, batch_size, model
                 )
-                # TODO convert out to time
+
+                median = out.median * 1000
+
+                mean = out.mean * 1000
+
                 csv_data.append(
-                    [batch_size, model, compiled, time, args.device, "backbone"]
+                    [batch_size, model, compiled, median, mean, args.device, "backbone"]
                 )
 
     with open("all.csv", "a", newline="") as csvfile:
@@ -203,7 +209,7 @@ def run_in_subprocess(target_func, inputs=None):
     process.join(timeout=timeout)
 
     if results["error"] is not None:
-        raise results["error"]
+        raise Exception(results["error"])
 
     return results["out"]
 
