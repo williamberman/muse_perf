@@ -121,7 +121,7 @@ def main():
                 mean = out.mean * 1000
 
                 csv_data.append(
-                    [batch_size, model, compiled, median, mean, args.device, "backbone"]
+                    [batch_size, model, str(compiled), median, mean, args.device, "backbone"]
                 )
 
                 Compare([out]).print()
@@ -261,7 +261,7 @@ def wrap_subprocess_fn(in_queue, out_queue, timeout, fn):
 
 
 def run_in_subprocess(target_func, inputs=None):
-    timeout = 600
+    timeout = None
 
     ctx = multiprocessing.get_context("spawn")
 
