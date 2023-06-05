@@ -7,6 +7,7 @@ import multiprocessing
 import traceback
 from argparse import ArgumentParser
 import csv
+from diffusers import UNet2DConditionModel
 
 from transformers import CLIPTextModel, AutoTokenizer, CLIPTokenizer
 
@@ -85,9 +86,35 @@ def main():
             for compiled in params[args.device][model]["backbone"]["batch_size"][
                 batch_size
             ]:
-                out = muse_benchmark_transformer_backbone(
-                    torch_device, dtype, compiled, batch_size, model
+                label = (
+                    f"single pass backbone, batch_size: {batch_size}, dtype: {dtype}"
                 )
+                description = f"{model}, compiled {compiled}"
+
+                print(label)
+                print(description)
+
+                inputs = [
+                    torch_device,
+                    dtype,
+                    compiled,
+                    batch_size,
+                    model,
+                    label,
+                    description,
+                ]
+
+                if model in [
+                    "openMUSE/muse-laiona6-uvit-clip-220k",
+                    "williamberman/laiona6plus_uvit_clip_f8",
+                ]:
+                    fn = muse_benchmark_transformer_backbone
+                elif model == "runwayml/stable-diffusion-v1-5":
+                    fn = sd_benchmark_unet_backbone
+                else:
+                    assert False
+
+                out = run_in_subprocess(fn, inputs=inputs)
 
                 median = out.median * 1000
 
@@ -97,95 +124,139 @@ def main():
                     [batch_size, model, compiled, median, mean, args.device, "backbone"]
                 )
 
+                Compare([out]).print()
+                print("*******")
+
     with open("all.csv", "a", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerows(csv_data)
 
 
-def muse_benchmark_transformer_backbone(device, dtype, compiled, batch_size, model):
-    label = f"single pass backbone, batch_size: {batch_size}, dtype: {dtype}"
-    description = f"{model}, compiled {compiled}"
+def muse_benchmark_transformer_backbone(
+    device, dtype, compiled, batch_size, model, label, description
+):
+    text_encoder = CLIPTextModel.from_pretrained(model, subfolder="text_encoder").to(
+        device
+    )
 
-    print(label)
-    print(description)
+    tokenizer = AutoTokenizer.from_pretrained(model, subfolder="text_encoder")
 
-    inputs = [device, dtype, compiled, batch_size, model, label, description]
+    text_tokens = tokenizer(
+        prompt,
+        return_tensors="pt",
+        padding="max_length",
+        truncation=True,
+        max_length=tokenizer.model_max_length,
+    ).input_ids
+    text_tokens = text_tokens.to(device)
 
-    out = run_in_subprocess(_muse_benchmark_transformer_backbone, inputs=inputs)
+    encoder_hidden_states = text_encoder(text_tokens).last_hidden_state
 
-    Compare([out]).print()
+    encoder_hidden_states = encoder_hidden_states.expand(batch_size, -1, -1)
 
-    print("*******")
-    print()
-    print()
-    print()
+    encoder_hidden_states = encoder_hidden_states.to(dtype)
+
+    transformer = MaskGiTUViT.from_pretrained(model, subfolder="transformer")
+
+    transformer = transformer.to(device=device, dtype=dtype)
+
+    if compiled is not None:
+        transformer = torch.compile(transformer, mode=compiled)
+
+    image_tokens = torch.full(
+        (batch_size, 256), fill_value=5, dtype=torch.long, device=device
+    )
+
+    def benchmark_fn():
+        transformer(image_tokens, encoder_hidden_states=encoder_hidden_states)
+
+    benchmark_fn()
+
+    out = Timer(
+        stmt="benchmark_fn()",
+        globals={"benchmark_fn": benchmark_fn},
+        num_threads=num_threads,
+        label=label,
+        description=description,
+    ).blocked_autorange(min_run_time=1)
 
     return out
 
 
-def _muse_benchmark_transformer_backbone(in_queue, out_queue, timeout):
-    error = None
-    out = None
+def sd_benchmark_unet_backbone(
+    device, dtype, compiled, batch_size, model, label, description
+):
+    unet = UNet2DConditionModel.from_pretrained(model, subfolder="unet")
 
-    try:
-        device, dtype, compiled, batch_size, model, label, description = in_queue.get(
-            timeout=timeout
-        )
+    unet = unet.to(device=device, dtype=dtype)
 
-        text_encoder = CLIPTextModel.from_pretrained(
-            model, subfolder="text_encoder"
-        ).to(device)
+    if compiled is not None:
+        unet = torch.compile(unet, mode=compiled)
 
-        tokenizer = AutoTokenizer.from_pretrained(model, subfolder="text_encoder")
+    text_encoder = CLIPTextModel.from_pretrained(model, subfolder="text_encoder").to(
+        device
+    )
 
-        text_tokens = tokenizer(
-            prompt,
-            return_tensors="pt",
-            padding="max_length",
-            truncation=True,
-            max_length=tokenizer.model_max_length,
-        ).input_ids
-        text_tokens = text_tokens.to(device)
+    tokenizer = CLIPTokenizer.from_pretrained(model, subfolder="text_encoder")
 
-        encoder_hidden_states = text_encoder(text_tokens).last_hidden_state
+    text_tokens = tokenizer(
+        prompt,
+        return_tensors="pt",
+        padding="max_length",
+        truncation=True,
+        max_length=tokenizer.model_max_length,
+    ).input_ids
+    text_tokens = text_tokens.to(device)
 
-        encoder_hidden_states = encoder_hidden_states.expand(batch_size, -1, -1)
+    encoder_hidden_states = text_encoder(text_tokens).last_hidden_state
 
-        encoder_hidden_states = encoder_hidden_states.to(dtype)
+    encoder_hidden_states = encoder_hidden_states.expand(batch_size, -1, -1)
 
-        transformer = MaskGiTUViT.from_pretrained(model, subfolder="transformer")
+    encoder_hidden_states = encoder_hidden_states.to(dtype)
 
-        transformer = transformer.to(device=device, dtype=dtype)
+    latent_image = torch.randn((batch_size, 4, 64, 64), dtype=dtype, device=device)
 
-        if compiled is not None:
-            transformer = torch.compile(transformer, mode=compiled)
+    t = torch.randint(1, 999, (batch_size,), dtype=dtype, device=device)
 
-        image_tokens = torch.full(
-            (batch_size, 256), fill_value=5, dtype=torch.long, device=device
-        )
+    def benchmark_fn():
+        unet(latent_image, timestep=t, encoder_hidden_states=encoder_hidden_states)
 
-        def benchmark_fn():
-            transformer(image_tokens, encoder_hidden_states=encoder_hidden_states)
+    benchmark_fn()
 
-        benchmark_fn()
+    out = Timer(
+        stmt="benchmark_fn()",
+        globals={"benchmark_fn": benchmark_fn},
+        num_threads=num_threads,
+        label=label,
+        description=description,
+    ).blocked_autorange(min_run_time=1)
 
-        out = Timer(
-            stmt="benchmark_fn()",
-            globals={"benchmark_fn": benchmark_fn},
-            num_threads=num_threads,
-            label=label,
-            description=description,
-        ).blocked_autorange(min_run_time=1)
+    return out
 
-    except Exception:
-        error = f"{traceback.format_exc()}"
 
-    results = {"error": error, "out": out}
-    out_queue.put(results, timeout=timeout)
-    out_queue.join()
+def wrap_subprocess_fn(fn):
+    def wrapped(in_queue, out_queue, timeout):
+        error = None
+        out = None
+
+        try:
+            args = in_queue.get(timeout=timeout)
+
+            out = fn(*args)
+
+        except Exception:
+            error = f"{traceback.format_exc()}"
+
+        results = {"error": error, "out": out}
+        out_queue.put(results, timeout=timeout)
+        out_queue.join()
+
+    return wrapped
 
 
 def run_in_subprocess(target_func, inputs=None):
+    target_func = wrap_subprocess_fn(target_func)
+
     timeout = 600
 
     ctx = multiprocessing.get_context("spawn")
