@@ -67,7 +67,7 @@ if __name__ == "__main__":
 
     assert args.component in ["full", "backbone", "vae"]
 
-    fig, axs = plt.subplots(4, 3, sharey='row')
+    fig, axs = plt.subplots(4, 3, sharey="row")
 
     for row_idx, device in enumerate(["a100", "4090", "t4", "cpu"]):
         for col_idx, compiled in enumerate(["None", "default", "reduce-overhead"]):
