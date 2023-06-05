@@ -207,7 +207,7 @@ def _sd_benchmark_unet_backbone(
         device
     )
 
-    tokenizer = CLIPTokenizer.from_pretrained(model, subfolder="text_encoder")
+    tokenizer = CLIPTokenizer.from_pretrained(model, subfolder="tokenizer")
 
     text_tokens = tokenizer(
         prompt,
