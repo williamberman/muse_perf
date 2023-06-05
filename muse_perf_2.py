@@ -261,8 +261,6 @@ def wrap_subprocess_fn(in_queue, out_queue, timeout, fn):
 
 
 def run_in_subprocess(target_func, inputs=None):
-    target_func = wrap_subprocess_fn(target_func)
-
     timeout = 600
 
     ctx = multiprocessing.get_context("spawn")
