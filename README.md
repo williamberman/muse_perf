@@ -1,5 +1,5 @@
-![full](./full.png)
+![full](./artifacts/full.png)
 
-![backbone](./backbone.png)
+![backbone](./artifacts/backbone.png)
 
-![vae](./vae.png)
+![vae](./artifacts/vae.png)

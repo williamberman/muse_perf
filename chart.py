@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from argparse import ArgumentParser
 
-df = pd.read_csv("all.csv")
+df = pd.read_csv("artifacts/all.csv")
 bar_width = 0.25
 
 model_names = [

@@ -152,7 +152,7 @@ def main():
                         Compare([out]).print()
                         print("*******")
 
-    with open("all.csv", "a", newline="") as csvfile:
+    with open("artifacts/all.csv", "a", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerows(csv_data)
 
