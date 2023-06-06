@@ -226,7 +226,7 @@ def muse_benchmark_vae(in_queue, out_queue, timeout):
     wrap_subprocess_fn(in_queue, out_queue, timeout, _muse_benchmark_vae)
 
 
-def _muse_benchmark_vae(device, batch_size, dtype, compiled, model, label, description):
+def _muse_benchmark_vae(device, dtype, compiled, batch_size, model, label, description):
     vae_cls = model_config[model]["vae"]["cls"]
     vae = vae_cls.from_pretrained(model, subfolder="vae")
 
@@ -259,7 +259,7 @@ def sd_benchmark_vae(in_queue, out_queue, timeout):
     wrap_subprocess_fn(in_queue, out_queue, timeout, _sd_benchmark_vae)
 
 
-def _sd_benchmark_vae(device, batch_size, dtype, compiled, model, label, description):
+def _sd_benchmark_vae(device, dtype, compiled, batch_size, model, label, description):
     vae = AutoencoderKL.from_pretrained(model, subfolder="vae")
 
     vae = vae.to(device=device, dtype=dtype)
