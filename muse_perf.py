@@ -130,7 +130,7 @@ def main():
 
                         fn = model_config[model][component]["fn"]
 
-                        out = run_in_subprocess(fn, inputs=inputs)
+                        out, mem_bytes = run_in_subprocess(fn, inputs=inputs)
 
                         median = out.median * 1000
 
@@ -146,6 +146,7 @@ def main():
                                 args.device,
                                 component,
                                 timesteps,
+                                mem_bytes,
                             ]
                         )
 
@@ -166,52 +167,58 @@ def muse_benchmark_transformer_backbone(in_queue, out_queue, timeout):
 def _muse_benchmark_transformer_backbone(
     device, dtype, compiled, batch_size, model, label, description, timesteps
 ):
-    text_encoder = CLIPTextModel.from_pretrained(model, subfolder="text_encoder").to(
-        device
-    )
+    def fn():
+        text_encoder = CLIPTextModel.from_pretrained(
+            model, subfolder="text_encoder"
+        ).to(device)
 
-    tokenizer = AutoTokenizer.from_pretrained(model, subfolder="text_encoder")
+        tokenizer = AutoTokenizer.from_pretrained(model, subfolder="text_encoder")
 
-    text_tokens = tokenizer(
-        prompt,
-        return_tensors="pt",
-        padding="max_length",
-        truncation=True,
-        max_length=tokenizer.model_max_length,
-    ).input_ids
-    text_tokens = text_tokens.to(device)
+        text_tokens = tokenizer(
+            prompt,
+            return_tensors="pt",
+            padding="max_length",
+            truncation=True,
+            max_length=tokenizer.model_max_length,
+        ).input_ids
+        text_tokens = text_tokens.to(device)
 
-    encoder_hidden_states = text_encoder(text_tokens).last_hidden_state
+        encoder_hidden_states = text_encoder(text_tokens).last_hidden_state
 
-    encoder_hidden_states = encoder_hidden_states.expand(batch_size, -1, -1)
+        encoder_hidden_states = encoder_hidden_states.expand(batch_size, -1, -1)
 
-    encoder_hidden_states = encoder_hidden_states.to(dtype)
+        encoder_hidden_states = encoder_hidden_states.to(dtype)
 
-    transformer = MaskGiTUViT.from_pretrained(model, subfolder="transformer")
+        transformer = MaskGiTUViT.from_pretrained(model, subfolder="transformer")
 
-    transformer = transformer.to(device=device, dtype=dtype)
+        transformer = transformer.to(device=device, dtype=dtype)
 
-    if compiled is not None:
-        transformer = torch.compile(transformer, mode=compiled)
+        if compiled is not None:
+            transformer = torch.compile(transformer, mode=compiled)
 
-    image_tokens = torch.full(
-        (batch_size, 256), fill_value=5, dtype=torch.long, device=device
-    )
+        image_tokens = torch.full(
+            (batch_size, 256), fill_value=5, dtype=torch.long, device=device
+        )
 
-    def benchmark_fn():
-        transformer(image_tokens, encoder_hidden_states=encoder_hidden_states)
+        def benchmark_fn():
+            transformer(image_tokens, encoder_hidden_states=encoder_hidden_states)
 
-    benchmark_fn()
+        benchmark_fn()
 
-    out = Timer(
-        stmt="benchmark_fn()",
-        globals={"benchmark_fn": benchmark_fn},
-        num_threads=num_threads,
-        label=label,
-        description=description,
-    ).blocked_autorange(min_run_time=1)
+        out = Timer(
+            stmt="benchmark_fn()",
+            globals={"benchmark_fn": benchmark_fn},
+            num_threads=num_threads,
+            label=label,
+            description=description,
+        ).blocked_autorange(min_run_time=1)
 
-    return out
+        return out
+
+    if device == "cuda":
+        return measure_max_memory_allocated(fn)
+    else:
+        return fn(), None
 
 
 def sd_benchmark_unet_backbone(in_queue, out_queue, timeout):
@@ -221,52 +228,58 @@ def sd_benchmark_unet_backbone(in_queue, out_queue, timeout):
 def _sd_benchmark_unet_backbone(
     device, dtype, compiled, batch_size, model, label, description, timesteps
 ):
-    unet = UNet2DConditionModel.from_pretrained(model, subfolder="unet")
+    def fn():
+        unet = UNet2DConditionModel.from_pretrained(model, subfolder="unet")
 
-    unet = unet.to(device=device, dtype=dtype)
+        unet = unet.to(device=device, dtype=dtype)
 
-    if compiled is not None:
-        unet = torch.compile(unet, mode=compiled)
+        if compiled is not None:
+            unet = torch.compile(unet, mode=compiled)
 
-    text_encoder = CLIPTextModel.from_pretrained(model, subfolder="text_encoder").to(
-        device
-    )
+        text_encoder = CLIPTextModel.from_pretrained(
+            model, subfolder="text_encoder"
+        ).to(device)
 
-    tokenizer = CLIPTokenizer.from_pretrained(model, subfolder="tokenizer")
+        tokenizer = CLIPTokenizer.from_pretrained(model, subfolder="tokenizer")
 
-    text_tokens = tokenizer(
-        prompt,
-        return_tensors="pt",
-        padding="max_length",
-        truncation=True,
-        max_length=tokenizer.model_max_length,
-    ).input_ids
-    text_tokens = text_tokens.to(device)
+        text_tokens = tokenizer(
+            prompt,
+            return_tensors="pt",
+            padding="max_length",
+            truncation=True,
+            max_length=tokenizer.model_max_length,
+        ).input_ids
+        text_tokens = text_tokens.to(device)
 
-    encoder_hidden_states = text_encoder(text_tokens).last_hidden_state
+        encoder_hidden_states = text_encoder(text_tokens).last_hidden_state
 
-    encoder_hidden_states = encoder_hidden_states.expand(batch_size, -1, -1)
+        encoder_hidden_states = encoder_hidden_states.expand(batch_size, -1, -1)
 
-    encoder_hidden_states = encoder_hidden_states.to(dtype)
+        encoder_hidden_states = encoder_hidden_states.to(dtype)
 
-    latent_image = torch.randn((batch_size, 4, 64, 64), dtype=dtype, device=device)
+        latent_image = torch.randn((batch_size, 4, 64, 64), dtype=dtype, device=device)
 
-    t = torch.randint(1, 999, (batch_size,), dtype=dtype, device=device)
+        t = torch.randint(1, 999, (batch_size,), dtype=dtype, device=device)
 
-    def benchmark_fn():
-        unet(latent_image, timestep=t, encoder_hidden_states=encoder_hidden_states)
+        def benchmark_fn():
+            unet(latent_image, timestep=t, encoder_hidden_states=encoder_hidden_states)
 
-    benchmark_fn()
+        benchmark_fn()
 
-    out = Timer(
-        stmt="benchmark_fn()",
-        globals={"benchmark_fn": benchmark_fn},
-        num_threads=num_threads,
-        label=label,
-        description=description,
-    ).blocked_autorange(min_run_time=1)
+        out = Timer(
+            stmt="benchmark_fn()",
+            globals={"benchmark_fn": benchmark_fn},
+            num_threads=num_threads,
+            label=label,
+            description=description,
+        ).blocked_autorange(min_run_time=1)
 
-    return out
+        return out
+
+    if device == "cuda":
+        return measure_max_memory_allocated(fn)
+    else:
+        return fn(), None
 
 
 def muse_benchmark_vae(in_queue, out_queue, timeout):
@@ -276,32 +289,38 @@ def muse_benchmark_vae(in_queue, out_queue, timeout):
 def _muse_benchmark_vae(
     device, dtype, compiled, batch_size, model, label, description, timesteps
 ):
-    vae_cls = model_config[model]["vae"]["cls"]
-    vae = vae_cls.from_pretrained(model, subfolder="vae")
+    def fn():
+        vae_cls = model_config[model]["vae"]["cls"]
+        vae = vae_cls.from_pretrained(model, subfolder="vae")
 
-    vae = vae.to(device=device, dtype=dtype)
+        vae = vae.to(device=device, dtype=dtype)
 
-    if compiled is not None:
-        vae = torch.compile(vae, mode=compiled)
+        if compiled is not None:
+            vae = torch.compile(vae, mode=compiled)
 
-    image_tokens = torch.full(
-        (batch_size, 256), fill_value=5, dtype=torch.long, device=device
-    )
+        image_tokens = torch.full(
+            (batch_size, 256), fill_value=5, dtype=torch.long, device=device
+        )
 
-    def benchmark_fn():
-        vae.decode_code(image_tokens)
+        def benchmark_fn():
+            vae.decode_code(image_tokens)
 
-    benchmark_fn()
+        benchmark_fn()
 
-    out = Timer(
-        stmt="benchmark_fn()",
-        globals={"benchmark_fn": benchmark_fn},
-        num_threads=num_threads,
-        label=label,
-        description=description,
-    ).blocked_autorange(min_run_time=1)
+        out = Timer(
+            stmt="benchmark_fn()",
+            globals={"benchmark_fn": benchmark_fn},
+            num_threads=num_threads,
+            label=label,
+            description=description,
+        ).blocked_autorange(min_run_time=1)
 
-    return out
+        return out
+
+    if device == "cuda":
+        return measure_max_memory_allocated(fn)
+    else:
+        return fn(), None
 
 
 def sd_benchmark_vae(in_queue, out_queue, timeout):
@@ -311,29 +330,35 @@ def sd_benchmark_vae(in_queue, out_queue, timeout):
 def _sd_benchmark_vae(
     device, dtype, compiled, batch_size, model, label, description, timesteps
 ):
-    vae = AutoencoderKL.from_pretrained(model, subfolder="vae")
+    def fn():
+        vae = AutoencoderKL.from_pretrained(model, subfolder="vae")
 
-    vae = vae.to(device=device, dtype=dtype)
+        vae = vae.to(device=device, dtype=dtype)
 
-    if compiled is not None:
-        vae = torch.compile(vae, mode=compiled)
+        if compiled is not None:
+            vae = torch.compile(vae, mode=compiled)
 
-    latent_image = torch.randn((batch_size, 4, 64, 64), dtype=dtype, device=device)
+        latent_image = torch.randn((batch_size, 4, 64, 64), dtype=dtype, device=device)
 
-    def benchmark_fn():
-        vae.decode(latent_image)
+        def benchmark_fn():
+            vae.decode(latent_image)
 
-    benchmark_fn()
+        benchmark_fn()
 
-    out = Timer(
-        stmt="benchmark_fn()",
-        globals={"benchmark_fn": benchmark_fn},
-        num_threads=num_threads,
-        label=label,
-        description=description,
-    ).blocked_autorange(min_run_time=1)
+        out = Timer(
+            stmt="benchmark_fn()",
+            globals={"benchmark_fn": benchmark_fn},
+            num_threads=num_threads,
+            label=label,
+            description=description,
+        ).blocked_autorange(min_run_time=1)
 
-    return out
+        return out
+
+    if device == "cuda":
+        return measure_max_memory_allocated(fn)
+    else:
+        return fn(), None
 
 
 def muse_benchmark_full(in_queue, out_queue, timeout):
@@ -343,48 +368,54 @@ def muse_benchmark_full(in_queue, out_queue, timeout):
 def _muse_benchmark_full(
     device, dtype, compiled, batch_size, model, label, description, timesteps
 ):
-    tokenizer = AutoTokenizer.from_pretrained(model, subfolder="text_encoder")
+    def fn():
+        tokenizer = AutoTokenizer.from_pretrained(model, subfolder="text_encoder")
 
-    text_encoder = CLIPTextModel.from_pretrained(model, subfolder="text_encoder").to(
-        device=device, dtype=dtype
-    )
+        text_encoder = CLIPTextModel.from_pretrained(
+            model, subfolder="text_encoder"
+        ).to(device=device, dtype=dtype)
 
-    vae_cls = model_config[model]["vae"]["cls"]
-    vae = vae_cls.from_pretrained(model, subfolder="vae")
+        vae_cls = model_config[model]["vae"]["cls"]
+        vae = vae_cls.from_pretrained(model, subfolder="vae")
 
-    vae = vae.to(device=device, dtype=dtype)
+        vae = vae.to(device=device, dtype=dtype)
 
-    transformer = MaskGiTUViT.from_pretrained(model, subfolder="transformer")
+        transformer = MaskGiTUViT.from_pretrained(model, subfolder="transformer")
 
-    transformer = transformer.to(device=device, dtype=dtype)
+        transformer = transformer.to(device=device, dtype=dtype)
 
-    if compiled is not None:
-        vae = torch.compile(vae, mode=compiled)
-        transformer = torch.compile(transformer, model=compiled)
+        if compiled is not None:
+            vae = torch.compile(vae, mode=compiled)
+            transformer = torch.compile(transformer, mode=compiled)
 
-    pipe = PipelineMuse(
-        tokenizer=tokenizer,
-        text_encoder=text_encoder,
-        vae=vae,
-        transformer=transformer,
-    )
-    pipe.device = device
-    pipe.dtype = dtype
+        pipe = PipelineMuse(
+            tokenizer=tokenizer,
+            text_encoder=text_encoder,
+            vae=vae,
+            transformer=transformer,
+        )
+        pipe.device = device
+        pipe.dtype = dtype
 
-    def benchmark_fn():
-        pipe(prompt, num_images_per_prompt=batch_size, timesteps=timesteps)
+        def benchmark_fn():
+            pipe(prompt, num_images_per_prompt=batch_size, timesteps=timesteps)
 
-    pipe(prompt, num_images_per_prompt=batch_size, timesteps=2)
+        pipe(prompt, num_images_per_prompt=batch_size, timesteps=2)
 
-    out = Timer(
-        stmt="benchmark_fn()",
-        globals={"benchmark_fn": benchmark_fn},
-        num_threads=num_threads,
-        label=label,
-        description=description,
-    ).blocked_autorange(min_run_time=1)
+        out = Timer(
+            stmt="benchmark_fn()",
+            globals={"benchmark_fn": benchmark_fn},
+            num_threads=num_threads,
+            label=label,
+            description=description,
+        ).blocked_autorange(min_run_time=1)
 
-    return out
+        return out
+
+    if device == "cuda":
+        return measure_max_memory_allocated(fn)
+    else:
+        return fn(), None
 
 
 def sd_benchmark_full(in_queue, out_queue, timeout):
@@ -394,47 +425,67 @@ def sd_benchmark_full(in_queue, out_queue, timeout):
 def _sd_benchmark_full(
     device, dtype, compiled, batch_size, model, label, description, timesteps
 ):
-    tokenizer = CLIPTokenizer.from_pretrained(model, subfolder="tokenizer")
+    def fn():
+        tokenizer = CLIPTokenizer.from_pretrained(model, subfolder="tokenizer")
 
-    text_encoder = CLIPTextModel.from_pretrained(model, subfolder="text_encoder").to(
-        device=device, dtype=dtype
-    )
+        text_encoder = CLIPTextModel.from_pretrained(
+            model, subfolder="text_encoder"
+        ).to(device=device, dtype=dtype)
 
-    vae = AutoencoderKL.from_pretrained(model, subfolder="vae")
+        vae = AutoencoderKL.from_pretrained(model, subfolder="vae")
 
-    vae = vae.to(device=device, dtype=dtype)
+        vae = vae.to(device=device, dtype=dtype)
 
-    unet = UNet2DConditionModel.from_pretrained(model, subfolder="unet")
+        unet = UNet2DConditionModel.from_pretrained(model, subfolder="unet")
 
-    unet = unet.to(device=device, dtype=dtype)
+        unet = unet.to(device=device, dtype=dtype)
 
-    if compiled is not None:
-        vae = torch.compile(vae, mode=compiled)
-        unet = torch.compile(unet, mode=compiled)
+        if compiled is not None:
+            vae = torch.compile(vae, mode=compiled)
+            unet = torch.compile(unet, mode=compiled)
 
-    pipe = StableDiffusionPipeline.from_pretrained(
-        model,
-        vae=vae,
-        unet=unet,
-        text_encoder=text_encoder,
-        tokenizer=tokenizer,
-        safety_checker=None,
-    )
+        pipe = StableDiffusionPipeline.from_pretrained(
+            model,
+            vae=vae,
+            unet=unet,
+            text_encoder=text_encoder,
+            tokenizer=tokenizer,
+            safety_checker=None,
+        )
 
-    def benchmark_fn():
-        pipe(prompt, num_images_per_prompt=batch_size, num_inference_steps=timesteps)
+        def benchmark_fn():
+            pipe(
+                prompt, num_images_per_prompt=batch_size, num_inference_steps=timesteps
+            )
 
-    pipe(prompt, num_images_per_prompt=batch_size, num_inference_steps=2)
+        pipe(prompt, num_images_per_prompt=batch_size, num_inference_steps=2)
 
-    out = Timer(
-        stmt="benchmark_fn()",
-        globals={"benchmark_fn": benchmark_fn},
-        num_threads=num_threads,
-        label=label,
-        description=description,
-    ).blocked_autorange(min_run_time=1)
+        out = Timer(
+            stmt="benchmark_fn()",
+            globals={"benchmark_fn": benchmark_fn},
+            num_threads=num_threads,
+            label=label,
+            description=description,
+        ).blocked_autorange(min_run_time=1)
 
-    return out
+        return out
+
+    if device == "cuda":
+        return measure_max_memory_allocated(fn)
+    else:
+        return fn(), None
+
+
+def measure_max_memory_allocated(fn):
+    torch.cuda.empty_cache()
+    torch.cuda.reset_max_memory_allocated()
+    torch.cuda.reset_peak_memory_stats()
+
+    rv = fn()
+
+    mem_bytes = torch.cuda.max_memory_allocated()
+
+    return rv, mem_bytes
 
 
 def wrap_subprocess_fn(in_queue, out_queue, timeout, fn):

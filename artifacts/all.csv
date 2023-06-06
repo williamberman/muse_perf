@@ -1,1 +1,1 @@
-Batch Size,Model Name,Compilation Type,Median,Mean,Device,Component,Timesteps
+Batch Size,Model Name,Compilation Type,Median,Mean,Device,Component,Timesteps,Max Memory
