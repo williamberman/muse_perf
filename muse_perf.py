@@ -54,6 +54,12 @@ skip = [
     ("t4", "runwayml/stable-diffusion-v1-5", "full", 8, "reduce-overhead"),
     ("t4", "runwayml/stable-diffusion-v1-5", "full", 16, "reduce-overhead"),
     ("t4", "runwayml/stable-diffusion-v1-5", "full", 32),
+    # cpu full
+    ("cpu", "runwayml/stable-diffusion-v1-5", "full", 2),
+    ("cpu", "runwayml/stable-diffusion-v1-5", "full", 4),
+    ("cpu", "runwayml/stable-diffusion-v1-5", "full", 8),
+    ("cpu", "runwayml/stable-diffusion-v1-5", "full", 16),
+    ("cpu", "runwayml/stable-diffusion-v1-5", "full", 32),
 ]
 
 
