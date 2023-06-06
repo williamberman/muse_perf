@@ -35,7 +35,7 @@ all_devices = ["4090", "t4", "a100", "cpu"]
 
 all_timesteps = [12, 20]
 
-skip = {
+skip = [
     # 4090 backbone
     ("4090", "runwayml/stable-diffusion-v1-5", "backbone", 32, "reduce-overhead"),
     # 4090 full
@@ -48,17 +48,13 @@ skip = {
     ("t4", "runwayml/stable-diffusion-v1-5", "backbone", 16, "reduce-overhead"),
     ("t4", "runwayml/stable-diffusion-v1-5", "backbone", 32, "reduce-overhead"),
     # t4 vae
-    ("t4", "runwayml/stable-diffusion-v1-5", "vae", 32, None),
-    ("t4", "runwayml/stable-diffusion-v1-5", "vae", 32, "default"),
-    ("t4", "runwayml/stable-diffusion-v1-5", "vae", 32, "reduce-overhead"),
+    ("t4", "runwayml/stable-diffusion-v1-5", "vae", 32),
     # t4 full
     ("t4", "runwayml/stable-diffusion-v1-5", "full", 4, "reduce-overhead"),
     ("t4", "runwayml/stable-diffusion-v1-5", "full", 8, "reduce-overhead"),
     ("t4", "runwayml/stable-diffusion-v1-5", "full", 16, "reduce-overhead"),
-    ("t4", "runwayml/stable-diffusion-v1-5", "full", 32, None),
-    ("t4", "runwayml/stable-diffusion-v1-5", "full", 32, "default"),
-    ("t4", "runwayml/stable-diffusion-v1-5", "full", 32, "reduce-overhead"),
-}
+    ("t4", "runwayml/stable-diffusion-v1-5", "full", 32),
+]
 
 
 def main():
@@ -81,9 +77,21 @@ def main():
     csv_data = []
 
     for model in all_models:
+        if (args.device, model) in skip:
+            continue
+
         for component in all_components:
+            if (args.device, model, component) in skip:
+                continue
+
             for batch_size in all_batch_sizes:
+                if (args.device, model, component, batch_size) in skip:
+                    continue
+
                 for compiled in all_compiled:
+                    if (args.device, model, component, batch_size, compiled) in skip:
+                        continue
+
                     if component == "full":
                         all_timesteps_ = all_timesteps
                     else:
@@ -102,17 +110,6 @@ def main():
 
                         print(label)
                         print(description)
-
-                        if (
-                            args.device,
-                            model,
-                            component,
-                            batch_size,
-                            compiled,
-                        ) in skip:
-                            print("========skipping========")
-                            print("*******")
-                            continue
 
                         inputs = [
                             torch_device,
