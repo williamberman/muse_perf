@@ -71,6 +71,18 @@ def chart(device, component, compiled, plot_on, legend, y_axis_key, y_label, tim
         plot_on.legend(fontsize="x-small")
 
 
+"""
+python muse_chart.py --component full --graphing time --timesteps 12
+python muse_chart.py --component full --graphing time --timesteps 20
+python muse_chart.py --component full --graphing memory --timesteps 12
+python muse_chart.py --component full --graphing memory --timesteps 20
+
+python muse_chart.py --component backbone --graphing time
+python muse_chart.py --component backbone --graphing memory
+
+python muse_chart.py --component vae --graphing time
+python muse_chart.py --component vae --graphing memory
+"""
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--component", required=True)
