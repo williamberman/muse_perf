@@ -370,7 +370,7 @@ def sd_benchmark_full(in_queue, out_queue, timeout):
 def _sd_benchmark_full(
     device, dtype, compiled, batch_size, model, label, description, timesteps
 ):
-    tokenizer = CLIPTokenizer.from_pretrained(model, subfolder="text_encoder")
+    tokenizer = CLIPTokenizer.from_pretrained(model, subfolder="tokenizer")
 
     text_encoder = CLIPTextModel.from_pretrained(model, subfolder="text_encoder").to(
         device=device, dtype=dtype
