@@ -37,6 +37,10 @@ all_timesteps = [12, 20]
 
 skip = {
     ("4090", "runwayml/stable-diffusion-v1-5", "backbone", 32, "reduce-overhead"),
+    ("4090", "runwayml/stable-diffusion-v1-5", "full", 8, "reduce-overhead"),
+    ("4090", "runwayml/stable-diffusion-v1-5", "full", 16, "reduce-overhead"),
+    ("4090", "runwayml/stable-diffusion-v1-5", "full", 32, "default"),
+    ("4090", "runwayml/stable-diffusion-v1-5", "full", 32, "reduce-overhead"),
 }
 
 
