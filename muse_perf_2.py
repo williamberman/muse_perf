@@ -7,7 +7,7 @@ import multiprocessing
 import traceback
 from argparse import ArgumentParser
 import csv
-from diffusers import UNet2DConditionModel
+from diffusers import UNet2DConditionModel, AutoencoderKL
 
 from transformers import CLIPTextModel, AutoTokenizer, CLIPTokenizer
 
@@ -18,47 +18,23 @@ torch.set_float32_matmul_precision("high")
 num_threads = torch.get_num_threads()
 prompt = "A high tech solarpunk utopia in the Amazon rainforest"
 
+
+all_models = [
+    "openMUSE/muse-laiona6-uvit-clip-220k",
+    "runwayml/stable-diffusion-v1-5",
+    "williamberman/laiona6plus_uvit_clip_f8",
+]
+
+all_batch_sizes = [1, 2, 4, 8, 16, 32]
+
 all_compiled = [None, "default", "reduce-overhead"]
 
-params = {
-    "4090": {
-        "openMUSE/muse-laiona6-uvit-clip-220k": {
-            "backbone": {
-                "batch_size": {
-                    1: all_compiled,
-                    2: all_compiled,
-                    4: all_compiled,
-                    8: all_compiled,
-                    16: all_compiled,
-                    32: all_compiled,
-                }
-            }
-        },
-        "runwayml/stable-diffusion-v1-5": {
-            "backbone": {
-                "batch_size": {
-                    1: all_compiled,
-                    2: all_compiled,
-                    4: all_compiled,
-                    8: all_compiled,
-                    16: all_compiled,
-                    32: {"compiled": [None, "default"]},
-                }
-            }
-        },
-        "williamberman/laiona6plus_uvit_clip_f8": {
-            "backbone": {
-                "batch_size": {
-                    1: all_compiled,
-                    2: all_compiled,
-                    4: all_compiled,
-                    8: all_compiled,
-                    16: all_compiled,
-                    32: all_compiled,
-                }
-            }
-        },
-    },
+all_components = ["backbone", "vae", "full"]
+
+all_devices = ["4090", "t4", "a100", "cpu"]
+
+skip = {
+    ("4090", "runwayml/stable-diffusion-v1-5", "backbone", 32, "reduce-overhead"),
 }
 
 
@@ -68,7 +44,7 @@ def main():
 
     args = args.parse_args()
 
-    assert args.device in params
+    assert args.device in all_devices
 
     if args.device in ["4090", "a100", "t4"]:
         dtype = torch.float16
@@ -81,51 +57,53 @@ def main():
 
     csv_data = []
 
-    for model in params[args.device].keys():
-        for batch_size in params[args.device][model]["backbone"]["batch_size"].keys():
-            for compiled in params[args.device][model]["backbone"]["batch_size"][
-                batch_size
-            ]:
-                label = (
-                    f"single pass backbone, batch_size: {batch_size}, dtype: {dtype}"
-                )
-                description = f"{model}, compiled {compiled}"
+    for model in all_models:
+        for component in all_components:
+            for batch_size in all_batch_sizes:
+                for compiled in all_compiled:
+                    label = f"single pass {component}, batch_size: {batch_size}, dtype: {dtype}"
+                    description = f"{model}, compiled {compiled}"
 
-                print(label)
-                print(description)
+                    print(label)
+                    print(description)
 
-                inputs = [
-                    torch_device,
-                    dtype,
-                    compiled,
-                    batch_size,
-                    model,
-                    label,
-                    description,
-                ]
+                    if (args.device, model, component, batch_size, compiled) in skip:
+                        print("========skipping========")
+                        print("*******")
+                        continue
 
-                if model in [
-                    "openMUSE/muse-laiona6-uvit-clip-220k",
-                    "williamberman/laiona6plus_uvit_clip_f8",
-                ]:
-                    fn = muse_benchmark_transformer_backbone
-                elif model == "runwayml/stable-diffusion-v1-5":
-                    fn = sd_benchmark_unet_backbone
-                else:
-                    assert False
+                    inputs = [
+                        torch_device,
+                        dtype,
+                        compiled,
+                        batch_size,
+                        model,
+                        label,
+                        description,
+                    ]
 
-                out = run_in_subprocess(fn, inputs=inputs)
+                    fn = model_config[model][component]["fn"]
 
-                median = out.median * 1000
+                    out = run_in_subprocess(fn, inputs=inputs)
 
-                mean = out.mean * 1000
+                    median = out.median * 1000
 
-                csv_data.append(
-                    [batch_size, model, str(compiled), median, mean, args.device, "backbone"]
-                )
+                    mean = out.mean * 1000
 
-                Compare([out]).print()
-                print("*******")
+                    csv_data.append(
+                        [
+                            batch_size,
+                            model,
+                            str(compiled),
+                            median,
+                            mean,
+                            args.device,
+                            "backbone",
+                        ]
+                    )
+
+                    Compare([out]).print()
+                    print("*******")
 
     with open("all.csv", "a", newline="") as csvfile:
         writer = csv.writer(csvfile)
@@ -244,6 +222,69 @@ def _sd_benchmark_unet_backbone(
     return out
 
 
+def muse_benchmark_vae(in_queue, out_queue, timeout):
+    wrap_subprocess_fn(in_queue, out_queue, timeout, _muse_benchmark_vae)
+
+
+def _muse_benchmark_vae(device, batch_size, dtype, compiled, model, label, description):
+    vae_cls = model_config[model]["vae"]["cls"]
+    vae = vae_cls.from_pretrained(model, subfolder="vae")
+
+    vae = vae.to(device=device, dtype=dtype)
+
+    if compiled is not None:
+        vae = torch.compile(vae, mode=compiled)
+
+    image_tokens = torch.full(
+        (batch_size, 256), fill_value=5, dtype=torch.long, device=device
+    )
+
+    def benchmark_fn():
+        vae.decode_code(image_tokens)
+
+    benchmark_fn()
+
+    out = Timer(
+        stmt="benchmark_fn()",
+        globals={"benchmark_fn": benchmark_fn},
+        num_threads=num_threads,
+        label=label,
+        description=description,
+    ).blocked_autorange(min_run_time=1)
+
+    return out
+
+
+def sd_benchmark_vae(in_queue, out_queue, timeout):
+    wrap_subprocess_fn(in_queue, out_queue, timeout, _sd_benchmark_vae)
+
+
+def _sd_benchmark_vae(device, batch_size, dtype, compiled, model, label, description):
+    vae = AutoencoderKL.from_pretrained(model, subfolder="vae")
+
+    vae = vae.to(device=device, dtype=dtype)
+
+    if compiled is not None:
+        vae = torch.compile(vae, mode=compiled)
+
+    latent_image = torch.randn((batch_size, 4, 64, 64), dtype=dtype, device=device)
+
+    def benchmark_fn():
+        vae.decode(latent_image)
+
+    benchmark_fn()
+
+    out = Timer(
+        stmt="benchmark_fn()",
+        globals={"benchmark_fn": benchmark_fn},
+        num_threads=num_threads,
+        label=label,
+        description=description,
+    ).blocked_autorange(min_run_time=1)
+
+    return out
+
+
 def wrap_subprocess_fn(in_queue, out_queue, timeout, fn):
     error = None
     out = None
@@ -287,6 +328,36 @@ def run_in_subprocess(target_func, inputs=None):
         raise Exception(results["error"])
 
     return results["out"]
+
+
+model_config = {
+    "openMUSE/muse-laiona6-uvit-clip-220k": {
+        "backbone": {
+            "fn": muse_benchmark_transformer_backbone,
+        },
+        "vae": {
+            "fn": muse_benchmark_vae,
+            "cls": VQGANModel,
+        },
+    },
+    "runwayml/stable-diffusion-v1-5": {
+        "backbone": {
+            "fn": sd_benchmark_unet_backbone,
+        },
+        "vae": {
+            "fn": sd_benchmark_vae,
+        },
+    },
+    "williamberman/laiona6plus_uvit_clip_f8": {
+        "backbone": {
+            "fn": muse_benchmark_transformer_backbone,
+        },
+        "vae": {
+            "fn": muse_benchmark_vae,
+            "cls": PaellaVQModel,
+        },
+    },
+}
 
 
 if __name__ == "__main__":
