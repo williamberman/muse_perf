@@ -7,7 +7,7 @@ import multiprocessing
 import traceback
 from argparse import ArgumentParser
 import csv
-from diffusers import UNet2DConditionModel, AutoencoderKL
+from diffusers import UNet2DConditionModel, AutoencoderKL, StableDiffusionPipeline
 
 from transformers import CLIPTextModel, AutoTokenizer, CLIPTokenizer
 
@@ -32,6 +32,8 @@ all_compiled = [None, "default", "reduce-overhead"]
 all_components = ["backbone", "vae", "full"]
 
 all_devices = ["4090", "t4", "a100", "cpu"]
+
+all_timesteps = [12, 20]
 
 skip = {
     ("4090", "runwayml/stable-diffusion-v1-5", "backbone", 32, "reduce-overhead"),
@@ -61,49 +63,70 @@ def main():
         for component in all_components:
             for batch_size in all_batch_sizes:
                 for compiled in all_compiled:
-                    label = f"single pass {component}, batch_size: {batch_size}, dtype: {dtype}"
-                    description = f"{model}, compiled {compiled}"
+                    if component == "ful":
+                        all_timesteps_ = all_timesteps
+                    else:
+                        all_timesteps_ = [None]
 
-                    print(label)
-                    print(description)
+                    for timesteps in all_timesteps_:
+                        if component in ["backbone", "vae"]:
+                            label = f"single pass {component}"
+                        elif component == "full":
+                            label = "full pipeline"
+                        else:
+                            assert False
 
-                    if (args.device, model, component, batch_size, compiled) in skip:
-                        print("========skipping========")
-                        print("*******")
-                        continue
+                        label = f"{label}, batch_size: {batch_size}, dtype: {dtype}, timesteps {timesteps}"
+                        description = f"{model}, compiled {compiled}"
 
-                    inputs = [
-                        torch_device,
-                        dtype,
-                        compiled,
-                        batch_size,
-                        model,
-                        label,
-                        description,
-                    ]
+                        print(label)
+                        print(description)
 
-                    fn = model_config[model][component]["fn"]
+                        if (
+                            args.device,
+                            model,
+                            component,
+                            batch_size,
+                            compiled,
+                        ) in skip:
+                            print("========skipping========")
+                            print("*******")
+                            continue
 
-                    out = run_in_subprocess(fn, inputs=inputs)
-
-                    median = out.median * 1000
-
-                    mean = out.mean * 1000
-
-                    csv_data.append(
-                        [
+                        inputs = [
+                            torch_device,
+                            dtype,
+                            compiled,
                             batch_size,
                             model,
-                            str(compiled),
-                            median,
-                            mean,
-                            args.device,
-                            component,
+                            label,
+                            description,
+                            timesteps,
                         ]
-                    )
 
-                    Compare([out]).print()
-                    print("*******")
+                        fn = model_config[model][component]["fn"]
+
+                        out = run_in_subprocess(fn, inputs=inputs)
+
+                        median = out.median * 1000
+
+                        mean = out.mean * 1000
+
+                        csv_data.append(
+                            [
+                                batch_size,
+                                model,
+                                str(compiled),
+                                median,
+                                mean,
+                                args.device,
+                                component,
+                                timesteps,
+                            ]
+                        )
+
+                        Compare([out]).print()
+                        print("*******")
 
     with open("all.csv", "a", newline="") as csvfile:
         writer = csv.writer(csvfile)
@@ -117,7 +140,7 @@ def muse_benchmark_transformer_backbone(in_queue, out_queue, timeout):
 
 
 def _muse_benchmark_transformer_backbone(
-    device, dtype, compiled, batch_size, model, label, description
+    device, dtype, compiled, batch_size, model, label, description, timesteps
 ):
     text_encoder = CLIPTextModel.from_pretrained(model, subfolder="text_encoder").to(
         device
@@ -172,7 +195,7 @@ def sd_benchmark_unet_backbone(in_queue, out_queue, timeout):
 
 
 def _sd_benchmark_unet_backbone(
-    device, dtype, compiled, batch_size, model, label, description
+    device, dtype, compiled, batch_size, model, label, description, timesteps
 ):
     unet = UNet2DConditionModel.from_pretrained(model, subfolder="unet")
 
@@ -226,7 +249,9 @@ def muse_benchmark_vae(in_queue, out_queue, timeout):
     wrap_subprocess_fn(in_queue, out_queue, timeout, _muse_benchmark_vae)
 
 
-def _muse_benchmark_vae(device, dtype, compiled, batch_size, model, label, description):
+def _muse_benchmark_vae(
+    device, dtype, compiled, batch_size, model, label, description, timesteps
+):
     vae_cls = model_config[model]["vae"]["cls"]
     vae = vae_cls.from_pretrained(model, subfolder="vae")
 
@@ -259,7 +284,9 @@ def sd_benchmark_vae(in_queue, out_queue, timeout):
     wrap_subprocess_fn(in_queue, out_queue, timeout, _sd_benchmark_vae)
 
 
-def _sd_benchmark_vae(device, dtype, compiled, batch_size, model, label, description):
+def _sd_benchmark_vae(
+    device, dtype, compiled, batch_size, model, label, description, timesteps
+):
     vae = AutoencoderKL.from_pretrained(model, subfolder="vae")
 
     vae = vae.to(device=device, dtype=dtype)
@@ -273,6 +300,111 @@ def _sd_benchmark_vae(device, dtype, compiled, batch_size, model, label, descrip
         vae.decode(latent_image)
 
     benchmark_fn()
+
+    out = Timer(
+        stmt="benchmark_fn()",
+        globals={"benchmark_fn": benchmark_fn},
+        num_threads=num_threads,
+        label=label,
+        description=description,
+    ).blocked_autorange(min_run_time=1)
+
+    return out
+
+
+def muse_benchmark_full(in_queue, out_queue, timeout):
+    wrap_subprocess_fn(in_queue, out_queue, timeout, _muse_benchmark_full)
+
+
+def _muse_benchmark_full(
+    device, dtype, compiled, batch_size, model, label, description, timesteps
+):
+    tokenizer = AutoTokenizer.from_pretrained(
+        all_models[model], subfolder="text_encoder"
+    )
+
+    text_encoder = CLIPTextModel.from_pretrained(
+        all_models[model], subfolder="text_encoder"
+    ).to(device=device, dtype=dtype)
+
+    vae_cls = model_config[model]["vae"]["cls"]
+    vae = vae_cls.from_pretrained(model, subfolder="vae")
+
+    vae = vae.to(device=device, dtype=dtype)
+
+    transformer = MaskGiTUViT.from_pretrained(model, subfolder="transformer")
+
+    transformer = transformer.to(device=device, dtype=dtype)
+
+    if compiled is not None:
+        vae = torch.compile(vae, mode=compiled)
+        transformer = torch.compile(transformer, model=compiled)
+
+    pipe = PipelineMuse(
+        tokenizer=tokenizer,
+        text_encoder=text_encoder,
+        vae=vae,
+        transformer=transformer,
+    )
+    pipe.device = device
+    pipe.dtype = dtype
+
+    def benchmark_fn():
+        pipe(prompt, num_images_per_prompt=batch_size, timesteps=timesteps)
+
+    pipe(prompt, num_images_per_prompt=batch_size, timesteps=2)
+
+    out = Timer(
+        stmt="benchmark_fn()",
+        globals={"benchmark_fn": benchmark_fn},
+        num_threads=num_threads,
+        label=label,
+        description=description,
+    ).blocked_autorange(min_run_time=1)
+
+    return out
+
+
+def sd_benchmark_full(in_queue, out_queue, timeout):
+    wrap_subprocess_fn(in_queue, out_queue, timeout, _sd_benchmark_full)
+
+
+def _sd_benchmark_full(
+    device, dtype, compiled, batch_size, model, label, description, timesteps
+):
+    tokenizer = CLIPTokenizer.from_pretrained(
+        all_models[model], subfolder="text_encoder"
+    )
+
+    text_encoder = CLIPTextModel.from_pretrained(
+        all_models[model], subfolder="text_encoder"
+    ).to(device=device, dtype=dtype)
+
+    vae = AutoencoderKL.from_pretrained(all_models["sd"], subfolder="vae")
+
+    vae = vae.to(device=device, dtype=dtype)
+
+    unet = UNet2DConditionModel.from_pretrained(all_models["sd"], subfolder="unet")
+
+    unet = unet.to(device=device, dtype=dtype)
+
+    if compiled is not None:
+        vae = torch.compile(vae, mode=compiled)
+        unet = torch.compile(unet, mode=compiled)
+
+    pipe = StableDiffusionPipeline.from_pretrained(
+        model,
+        vae=vae,
+        unet=unet,
+        text_encoder=text_encoder,
+        tokenizer=tokenizer,
+        safety_checker=None,
+    )
+
+    def benchmark_fn():
+        pipe(prompt, num_images_per_prompt=batch_size, num_inference_steps=timesteps)
+
+    pipe(prompt, num_images_per_prompt=batch_size, num_inference_steps=2)
 
     out = Timer(
         stmt="benchmark_fn()",
@@ -339,6 +471,7 @@ model_config = {
             "fn": muse_benchmark_vae,
             "cls": VQGANModel,
         },
+        "full": {"fn": muse_benchmark_full},
     },
     "runwayml/stable-diffusion-v1-5": {
         "backbone": {
@@ -347,6 +480,7 @@ model_config = {
         "vae": {
             "fn": sd_benchmark_vae,
         },
+        "full": {"fn": sd_benchmark_full},
     },
     "williamberman/laiona6plus_uvit_clip_f8": {
         "backbone": {
@@ -356,6 +490,7 @@ model_config = {
             "fn": muse_benchmark_vae,
             "cls": PaellaVQModel,
         },
+        "full": {"fn": muse_benchmark_full},
     },
 }
 
