@@ -319,13 +319,11 @@ def muse_benchmark_full(in_queue, out_queue, timeout):
 def _muse_benchmark_full(
     device, dtype, compiled, batch_size, model, label, description, timesteps
 ):
-    tokenizer = AutoTokenizer.from_pretrained(
-        all_models[model], subfolder="text_encoder"
-    )
+    tokenizer = AutoTokenizer.from_pretrained(model, subfolder="text_encoder")
 
-    text_encoder = CLIPTextModel.from_pretrained(
-        all_models[model], subfolder="text_encoder"
-    ).to(device=device, dtype=dtype)
+    text_encoder = CLIPTextModel.from_pretrained(model, subfolder="text_encoder").to(
+        device=device, dtype=dtype
+    )
 
     vae_cls = model_config[model]["vae"]["cls"]
     vae = vae_cls.from_pretrained(model, subfolder="vae")
@@ -372,19 +370,17 @@ def sd_benchmark_full(in_queue, out_queue, timeout):
 def _sd_benchmark_full(
     device, dtype, compiled, batch_size, model, label, description, timesteps
 ):
-    tokenizer = CLIPTokenizer.from_pretrained(
-        all_models[model], subfolder="text_encoder"
+    tokenizer = CLIPTokenizer.from_pretrained(model, subfolder="text_encoder")
+
+    text_encoder = CLIPTextModel.from_pretrained(model, subfolder="text_encoder").to(
+        device=device, dtype=dtype
     )
 
-    text_encoder = CLIPTextModel.from_pretrained(
-        all_models[model], subfolder="text_encoder"
-    ).to(device=device, dtype=dtype)
-
-    vae = AutoencoderKL.from_pretrained(all_models["sd"], subfolder="vae")
+    vae = AutoencoderKL.from_pretrained(model, subfolder="vae")
 
     vae = vae.to(device=device, dtype=dtype)
 
-    unet = UNet2DConditionModel.from_pretrained(all_models["sd"], subfolder="unet")
+    unet = UNet2DConditionModel.from_pretrained(model, subfolder="unet")
 
     unet = unet.to(device=device, dtype=dtype)
 
