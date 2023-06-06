@@ -63,7 +63,7 @@ def main():
         for component in all_components:
             for batch_size in all_batch_sizes:
                 for compiled in all_compiled:
-                    if component == "ful":
+                    if component == "full":
                         all_timesteps_ = all_timesteps
                     else:
                         all_timesteps_ = [None]
