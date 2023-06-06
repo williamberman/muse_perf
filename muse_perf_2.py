@@ -98,7 +98,7 @@ def main():
                             median,
                             mean,
                             args.device,
-                            "backbone",
+                            component,
                         ]
                     )
 
