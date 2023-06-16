@@ -136,6 +136,8 @@ def main():
 
                         mean = out.mean * 1000
 
+                        iqr = out.iqr * 1000
+
                         csv_data.append(
                             [
                                 batch_size,
@@ -147,6 +149,7 @@ def main():
                                 component,
                                 timesteps,
                                 mem_bytes,
+                                iqr
                             ]
                         )
 
